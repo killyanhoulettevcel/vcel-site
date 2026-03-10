@@ -17,10 +17,12 @@ const n8nFetch = (path: string, options: RequestInit = {}) => {
   const url = process.env.N8N_URL
   const key = process.env.N8N_API_KEY
   if (!url) throw new Error('N8N_URL manquant dans les variables Vercel')
+  if (!key) throw new Error('N8N_API_KEY manquant dans les variables Vercel')
   return fetch(`${url}/api/v1${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'X-N8N-API-KEY': key,
       ...options.headers,
     },
   })
@@ -89,8 +91,9 @@ async function generateGoogleJWT(credentials: any): Promise<string> {
     iat:   now,
   }
 
-  const header  = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const payload = btoa(JSON.stringify(claim))
+  const toBase64url = (str: string) => btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  const header  = toBase64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+  const payload = toBase64url(JSON.stringify(claim))
   const input   = `${header}.${payload}`
 
   // Signer avec la clé privée RSA
@@ -111,7 +114,7 @@ async function generateGoogleJWT(credentials: any): Promise<string> {
     new TextEncoder().encode(input)
   )
 
-  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
   return `${input}.${sig}`
 }
 
