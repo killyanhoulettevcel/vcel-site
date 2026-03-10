@@ -87,13 +87,23 @@ export default function CoachPage() {
         content: data.reply || data.error || 'Erreur de connexion',
         ts: new Date()
       }])
-      // Recharger les objectifs si action effectuée
-      if (data.action === 'objectif_created' || data.action === 'objectif_deleted') {
-        const r = await fetch('/api/objectifs')
-        if (r.ok) {
-          const obj = await r.json()
-          setDashboardData((prev: any) => ({ ...prev, objectifs: obj?.objectifs || [] }))
+      // Recharger les données après une action
+      if (data.action) {
+        const safe = async (url: string) => { try { const r = await fetch(url); return r.ok ? await r.json() : null } catch { return null } }
+        if (['objectif_created','objectif_updated','objectif_deleted'].includes(data.action)) {
+          const obj = await safe('/api/objectifs')
+          if (obj) setDashboardData((prev: any) => ({ ...prev, objectifs: obj?.objectifs || [] }))
         }
+        if (['leads_relanced','lead_updated'].includes(data.action)) {
+          const leads = await safe('/api/leads')
+          if (leads) setDashboardData((prev: any) => ({ ...prev, leads: leads || [] }))
+        }
+        if (data.action === 'facture_relanced') {
+          const factures = await safe('/api/factures')
+          if (factures) setDashboardData((prev: any) => ({ ...prev, factures: factures || [] }))
+        }
+        // Déclencher le rafraîchissement des notifications
+        window.dispatchEvent(new CustomEvent('coach:action', { detail: { action: data.action } }))
       }
     } catch {
       setMessages(prev => [...prev, {
