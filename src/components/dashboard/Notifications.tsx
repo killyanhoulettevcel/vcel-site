@@ -48,7 +48,13 @@ export default function Notifications() {
   useEffect(() => {
     fetchNotifs()
     const interval = setInterval(fetchNotifs, 30000)
-    return () => clearInterval(interval)
+    // Écouter les actions du coach
+    const onCoachAction = () => fetchNotifs()
+    window.addEventListener('coach:action', onCoachAction)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('coach:action', onCoachAction)
+    }
   }, [])
 
   // Fermer en cliquant dehors
