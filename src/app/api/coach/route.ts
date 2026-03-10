@@ -13,50 +13,99 @@ export async function POST(req: NextRequest) {
   const userId = (session.user as any).id
   const { messages, dashboardData, userName } = await req.json()
 
-  // Données business
+  // Données business enrichies
   const objectifs      = dashboardData?.objectifs || []
-  const dernierCA      = dashboardData?.ca?.[dashboardData.ca.length - 1]
-  const totalLeads     = dashboardData?.leads?.length || 0
-  const leadsChauds    = dashboardData?.leads?.filter((l: any) => l.score === 'chaud').length || 0
-  const leadsConvertis = dashboardData?.leads?.filter((l: any) => l.statut === 'converti').length || 0
-  const impayees       = dashboardData?.factures?.filter((f: any) => f.statut !== 'payée').length || 0
-  const wfErreurs      = dashboardData?.workflows?.filter((w: any) => w.statut === 'erreur').length || 0
+  const leads          = dashboardData?.leads || []
+  const factures       = dashboardData?.factures || []
+  const finances       = dashboardData?.ca || []
+  const workflows      = dashboardData?.workflows || []
+  const dernierCA      = finances[finances.length - 1]
+  const avant_dernierCA = finances[finances.length - 2]
+  const totalLeads     = leads.length
+  const leadsChauds    = leads.filter((l: any) => l.score === 'chaud')
+  const il7jours = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const leadsNonContactes = leadsChauds.filter((l: any) => {
+    if (l.statut === 'converti' || l.statut === 'perdu') return false
+    if (l.derniere_relance && new Date(l.derniere_relance) > il7jours) return false
+    return true
+  })
+  const leadsConvertis = leads.filter((l: any) => l.statut === 'converti').length
+  const impayees       = factures.filter((f: any) => f.statut !== 'payée')
+  const wfErreurs      = workflows.filter((w: any) => w.statut === 'erreur').length
   const scorePrix      = dashboardData?.scorePrix || null
   const secteur        = dashboardData?.secteur || null
+  const tauxConversion = totalLeads > 0 ? Math.round(leadsConvertis / totalLeads * 100) : 0
+  const evolutionCA    = avant_dernierCA?.ca_ht > 0
+    ? Math.round((((dernierCA?.ca_ht || 0) - avant_dernierCA.ca_ht) / avant_dernierCA.ca_ht) * 100)
+    : null
 
   const objectifsTexte = objectifs.length > 0
     ? objectifs.map((o: any) => `- ${o.label} : cible ${o.cible}${o.type === 'ca' ? '€' : o.type === 'conversion' ? '%' : ''} (${o.periode}) — ID: ${o.id}`).join('\n')
     : 'Aucun objectif défini'
 
+  const leadsChaudsTexte = leadsNonContactes.map((l: any) => {
+    const joursDepuis = l.derniere_relance
+      ? Math.floor((Date.now() - new Date(l.derniere_relance).getTime()) / (1000 * 60 * 60 * 24))
+      : Math.floor((Date.now() - new Date(l.created_at).getTime()) / (1000 * 60 * 60 * 24))
+    return `- ${l.nom || l.email} (${l.email}) — ${joursDepuis}j sans contact — ID: ${l.id}`
+  }).join('\n') || 'Aucun lead chaud à relancer'
+
+  const facturesTexte = impayees.slice(0, 5).map((f: any) =>
+    `- ${f.numero_facture} : ${f.montant_ttc}€ (${f.statut}) — ID: ${f.id}`
+  ).join('\n') || 'Aucune facture impayée'
+
   const systemPrompt = `Tu es le coach business personnel de ${userName}${secteur ? `, entrepreneur dans le secteur "${secteur}"` : ''}.
 
-Tu combines analyse business ET soutien psychologique. Tu sais que l'entrepreneuriat est solitaire et que les hauts et les bas font partie du chemin.
+Tu combines analyse business ET soutien psychologique. Tu es direct, humain, et tu AGIS — pas juste des conseils.
 
-DONNÉES ACTUELLES DE ${userName} :
-- CA dernier mois : ${dernierCA?.ca_ht || 0}€ (charges : ${dernierCA?.charges || 0}€, marge : ${dernierCA?.marge || 0}€)
-- Leads : ${totalLeads} total, ${leadsChauds} chauds, ${leadsConvertis} convertis (taux: ${totalLeads > 0 ? Math.round(leadsConvertis/totalLeads*100) : 0}%)
-- Factures impayées : ${impayees}
-- Workflows en erreur : ${wfErreurs}
-${scorePrix !== null ? `- Score santé tarifaire : ${scorePrix}/100` : ''}
+━━━ DONNÉES ACTUELLES ━━━
+CA ce mois : ${dernierCA?.ca_ht || 0}€ | Charges : ${dernierCA?.charges || 0}€ | Marge : ${dernierCA?.marge || 0}€
+${evolutionCA !== null ? `Évolution CA vs mois dernier : ${evolutionCA > 0 ? '+' : ''}${evolutionCA}%` : ''}
+Leads : ${totalLeads} total | ${leadsChauds.length} chauds | ${leadsConvertis} convertis | Taux conversion : ${tauxConversion}%
+Factures impayées : ${impayees.length} (${impayees.reduce((s: number, f: any) => s + (f.montant_ttc || 0), 0)}€)
+Workflows en erreur : ${wfErreurs}
+${scorePrix !== null ? `Score santé tarifaire : ${scorePrix}/100` : ''}
 
-OBJECTIFS ACTUELS :
+━━━ LEADS CHAUDS NON CONTACTÉS ━━━
+${leadsChaudsTexte}
+
+━━━ FACTURES IMPAYÉES ━━━
+${facturesTexte}
+
+━━━ OBJECTIFS ━━━
 ${objectifsTexte}
 
-TU PEUX CRÉER/MODIFIER DES OBJECTIFS :
-Quand l'utilisateur veut créer un objectif, propose une config précise et demande sa confirmation.
-Quand il confirme (dit "oui", "ok", "valide", "go", "c'est bon"), réponds UNIQUEMENT avec ce JSON (rien d'autre) :
+━━━ TES ACTIONS DISPONIBLES ━━━
+Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), réponds UNIQUEMENT avec le JSON correspondant :
+
+1. Créer un objectif :
 {"action":"create_objectif","data":{"type":"ca|leads|conversion|factures|custom","label":"texte","cible":nombre,"periode":"mensuel|annuel"}}
 
-Quand il veut supprimer un objectif existant et confirme :
-{"action":"delete_objectif","data":{"id":"uuid-de-l-objectif"}}
+2. Modifier un objectif existant (corriger si irréaliste) :
+{"action":"update_objectif","data":{"id":"uuid","label":"texte","cible":nombre,"periode":"mensuel|annuel"}}
 
-RÈGLES :
-- Parle en français, de façon chaleureuse, directe et humaine
-- Interprète les chiffres avec empathie, ne les récite pas
+3. Supprimer un objectif :
+{"action":"delete_objectif","data":{"id":"uuid"}}
+
+4. Relancer les leads chauds disponibles (adapte-toi au nombre réel, ne relance jamais les mêmes avant 7 jours) :
+{"action":"relancer_leads","data":{"ids":["id1","id2"],"message_coach":"Message de motivation court pour accompagner l'action"}}
+
+5. Marquer une facture en relance :
+{"action":"relancer_facture","data":{"id":"uuid","message_coach":"texte"}}
+
+6. Corriger le statut d'un lead (ex: passer en converti) :
+{"action":"update_lead","data":{"id":"uuid","statut":"contacté|qualifié|converti|perdu","score":"chaud|tiède|froid"}}
+
+━━━ RÈGLES ━━━
+- Parle en français, chaleureux, direct, humain. Zéro jargon.
+- Interprète les chiffres avec empathie — ne les récite pas
 - Écoute D'ABORD si quelqu'un se sent mal
 - Célèbre les petites victoires
-- Maximum 3-4 paragraphes. Sois concis et percutant
-- Emojis avec parcimonie
+- Quand tu vois des problèmes (leads non contactés, factures impayées, CA en chute), PROPOSE des actions concrètes
+- Si le CA baisse fort, propose de relancer les leads chauds
+- Si taux conversion < 10%, propose de revoir l'approche commerciale
+- Si objectif irréaliste (ex: doubler le CA en 1 mois), dis-le franchement et propose une correction
+- Maximum 3-4 paragraphes. Percutant.
 - Tu es UN coach qui CONNAÎT ce client — pas un chatbot générique`
 
   try {
@@ -65,7 +114,7 @@ RÈGLES :
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        max_tokens: 600,
+        max_tokens: 700,
         temperature: 0.85,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -82,32 +131,75 @@ RÈGLES :
     const data = await response.json()
     const reply = data.choices?.[0]?.message?.content || 'Je n\'ai pas pu générer une réponse.'
 
-    // Détecter si c'est une action JSON
+    // Détecter action JSON
     const trimmed = reply.trim()
     if (trimmed.startsWith('{"action"')) {
       try {
         const action = JSON.parse(trimmed)
 
+        // ── Créer objectif ──────────────────────────────────────────────────
         if (action.action === 'create_objectif') {
           const { type, label, cible, periode } = action.data
           const { error } = await supabaseAdmin.from('objectifs').insert({
             user_id: userId, type, label, cible, periode, actif: true
           })
-          if (error) return NextResponse.json({ reply: `❌ Erreur lors de la création : ${error.message}`, action: null })
+          if (error) return NextResponse.json({ reply: `❌ Erreur : ${error.message}` })
           return NextResponse.json({
-            reply: `✅ Objectif créé : **${label}** — cible ${cible}${type === 'ca' ? '€' : type === 'conversion' ? '%' : ''} (${periode})\n\nC'est dans tes objectifs maintenant. On va le surveiller ensemble 💪`,
+            reply: `✅ Objectif créé : **${label}** — cible ${cible}${type === 'ca' ? '€' : type === 'conversion' ? '%' : ''} (${periode})\n\nJe vais suivre ça avec toi. On y va 💪`,
             action: 'objectif_created'
           })
         }
 
-        if (action.action === 'delete_objectif') {
-          const { id } = action.data
-          await supabaseAdmin.from('objectifs').delete().eq('id', id).eq('user_id', userId)
+        // ── Modifier objectif ───────────────────────────────────────────────
+        if (action.action === 'update_objectif') {
+          const { id, label, cible, periode } = action.data
+          await supabaseAdmin.from('objectifs').update({ label, cible, periode }).eq('id', id).eq('user_id', userId)
           return NextResponse.json({
-            reply: `✅ Objectif supprimé. Tu peux en créer un nouveau quand tu veux.`,
+            reply: `✅ Objectif mis à jour : **${label}** — nouvelle cible ${cible} (${periode})\n\nC'est plus réaliste, on va l'atteindre ensemble.`,
+            action: 'objectif_updated'
+          })
+        }
+
+        // ── Supprimer objectif ──────────────────────────────────────────────
+        if (action.action === 'delete_objectif') {
+          await supabaseAdmin.from('objectifs').delete().eq('id', action.data.id).eq('user_id', userId)
+          return NextResponse.json({
+            reply: `✅ Objectif supprimé. Quand tu veux en créer un nouveau, je suis là.`,
             action: 'objectif_deleted'
           })
         }
+
+        // ── Relancer leads ──────────────────────────────────────────────────
+        if (action.action === 'relancer_leads') {
+          const { ids, message_coach } = action.data
+          await supabaseAdmin.from('leads')
+            .update({ statut: 'contacté', derniere_relance: new Date().toISOString() })
+            .in('id', ids).eq('user_id', userId)
+          return NextResponse.json({
+            reply: `✅ ${ids.length} lead${ids.length > 1 ? 's' : ''} relancé${ids.length > 1 ? 's' : ''} et marqué${ids.length > 1 ? 's' : ''} comme contacté${ids.length > 1 ? 's' : ''} 📞\n\n${message_coach}\n\nJe ne les repropose pas avant 7 jours.`,
+            action: 'leads_relanced'
+          })
+        }
+
+        // ── Relancer facture ────────────────────────────────────────────────
+        if (action.action === 'relancer_facture') {
+          await supabaseAdmin.from('factures').update({ statut: 'en retard' }).eq('id', action.data.id).eq('user_id', userId)
+          return NextResponse.json({
+            reply: `✅ Facture marquée en retard — pense à envoyer un email de relance aujourd'hui.\n\n${action.data.message_coach}`,
+            action: 'facture_relanced'
+          })
+        }
+
+        // ── Update lead ─────────────────────────────────────────────────────
+        if (action.action === 'update_lead') {
+          const { id, statut, score } = action.data
+          await supabaseAdmin.from('leads').update({ statut, score }).eq('id', id).eq('user_id', userId)
+          return NextResponse.json({
+            reply: `✅ Lead mis à jour — statut : ${statut}${score ? `, score : ${score}` : ''}.`,
+            action: 'lead_updated'
+          })
+        }
+
       } catch {
         // Pas un JSON valide, réponse normale
       }
