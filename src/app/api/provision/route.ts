@@ -240,7 +240,7 @@ async function createWorkflowResume(userId: string, clientEmail: string, clientN
         typeVersion: 4.4,
         position: [320, 300],
         parameters: {
-          url: `${process.env.NEXTAUTH_URL}/api/provision/resume-data?userId=${userId}`,
+          url: `${process.env.NEXTAUTH_URL || 'https://vcel-site-gpg3.vercel.app'}/api/provision/resume-data?userId=${userId}`,
           method: 'GET',
           sendHeaders: true,
           headerParameters: {
@@ -252,22 +252,32 @@ async function createWorkflowResume(userId: string, clientEmail: string, clientN
       {
         id: `gpt-resume-${userId}`,
         name: 'GPT Résumé IA',
-        type: 'n8n-nodes-base.openAi',
-        typeVersion: 1.3,
+        type: 'n8n-nodes-base.httpRequest',
+        typeVersion: 4.4,
         position: [540, 300],
         parameters: {
-          resource: 'chat',
-          operation: 'complete',
-          modelId: { __rl: true, value: 'gpt-4o-mini', mode: 'list' },
-          messages: {
-            values: [
-              { role: 'system', content: `Tu es le coach business de ${clientNom}. Rédige un résumé hebdomadaire chaleureux et motivant en HTML simple.` },
-              { role: 'user',   content: '={{ JSON.stringify($json) }}' }
+          url: 'https://api.openai.com/v1/chat/completions',
+          method: 'POST',
+          sendHeaders: true,
+          headerParameters: {
+            parameters: [
+              { name: 'Authorization', value: `Bearer ${process.env.OPENAI_API_KEY}` },
+              { name: 'Content-Type',  value: 'application/json' },
             ]
           },
-          options: { maxTokens: 600, temperature: 0.8 }
-        },
-        credentials: { openAiApi: { id: process.env.N8N_OPENAI_CREDENTIAL_ID!, name: 'OpenAI VCEL' } }
+          sendBody: true,
+          specifyBody: 'json',
+          jsonBody: `={
+  "model": "gpt-4o-mini",
+  "max_tokens": 600,
+  "temperature": 0.8,
+  "messages": [
+    { "role": "system", "content": "Tu es le coach business de ${clientNom}. Rédige un résumé hebdomadaire chaleureux et motivant en HTML simple." },
+    { "role": "user", "content": {{ JSON.stringify($json) }} }
+  ]
+}`,
+          options: {}
+        }
       },
       {
         id: `gmail-resume-${userId}`,
@@ -279,7 +289,7 @@ async function createWorkflowResume(userId: string, clientEmail: string, clientN
           sendTo:    clientEmail,
           subject:   `📊 Ton résumé de la semaine — VCEL`,
           emailType: 'html',
-          message:   '={{ $json.message.content }}',
+          message:   '={{ $json.choices[0].message.content }}',
           options:   { appendAttribution: false }
         },
         credentials: { gmailOAuth2: { id: process.env.N8N_GMAIL_CREDENTIAL_ID!, name: 'Gmail VCEL' } }
