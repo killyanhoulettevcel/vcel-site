@@ -299,6 +299,9 @@ async function activateWorkflow(workflowId: string): Promise<void> {
 
 // ── ENDPOINT PRINCIPAL ────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const N8N_URL = process.env.N8N_URL
+  const N8N_KEY = process.env.N8N_API_KEY
+  const SECRET  = process.env.PROVISIONING_SECRET
 
   console.log('[PROVISION] ENV CHECK - N8N_URL:', N8N_URL || 'MANQUANT', '| SECRET:', SECRET ? 'OK' : 'MANQUANT')
 
@@ -311,7 +314,7 @@ export async function POST(req: NextRequest) {
   console.log(`[PROVISION] Démarrage pour ${email} (${userId})`)
 
   // ── Étape 1 : Google Sheet ──────────────────────────────────────────────────
-  let sheetId = 'non-cree'
+  let sheetId = ''
   try {
     console.log('[PROVISION] Étape 1: Google Sheets...')
     sheetId = await createGoogleSheet(nom || email, email)
@@ -321,49 +324,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Étape 1 (Google Sheets): ' + e.message, step: 1 }, { status: 500 })
   }
 
-  // ── Étapes 2 & 3 : n8n workflows (skip si N8N_URL absent) ──────────────────
-  let wf2Id = 'skip'
-  let wf3Id = 'skip'
+  // ── Étape 2 : VCEL-2 ────────────────────────────────────────────────────────
+  let wf2Id = ''
+  try {
+    console.log('[PROVISION] Étape 2: VCEL-2...')
+    wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
+    await activateWorkflow(wf2Id)
+    console.log('[PROVISION] VCEL-2 OK:', wf2Id)
+  } catch (e: any) {
+    console.error('[PROVISION] Erreur étape 2:', e.message)
+    return NextResponse.json({ error: 'Étape 2 (VCEL-2): ' + e.message, step: 2, sheetId }, { status: 500 })
+  }
 
-  if (N8N_URL && N8N_KEY) {
-    try {
-      console.log('[PROVISION] Étape 2: VCEL-2...')
-      wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
-      await activateWorkflow(wf2Id)
-      console.log('[PROVISION] VCEL-2 OK:', wf2Id)
-    } catch (e: any) {
-      console.error('[PROVISION] Erreur étape 2 (non bloquant):', e.message)
-    }
-
-    try {
-      console.log('[PROVISION] Étape 3: VCEL-3...')
-      wf3Id = await createWorkflowResume(userId, email, nom || email)
-      await activateWorkflow(wf3Id)
-      console.log('[PROVISION] VCEL-3 OK:', wf3Id)
-    } catch (e: any) {
-      console.error('[PROVISION] Erreur étape 3 (non bloquant):', e.message)
-    }
-  } else {
-    console.log('[PROVISION] N8N_URL absent — workflows n8n skippés')
+  // ── Étape 3 : VCEL-3 ────────────────────────────────────────────────────────
+  let wf3Id = ''
+  try {
+    console.log('[PROVISION] Étape 3: VCEL-3...')
+    wf3Id = await createWorkflowResume(userId, email, nom || email)
+    await activateWorkflow(wf3Id)
+    console.log('[PROVISION] VCEL-3 OK:', wf3Id)
+  } catch (e: any) {
+    console.error('[PROVISION] Erreur étape 3:', e.message)
+    return NextResponse.json({ error: 'Étape 3 (VCEL-3): ' + e.message, step: 3, sheetId, wf2Id }, { status: 500 })
   }
 
   // ── Étape 4 : Supabase ──────────────────────────────────────────────────────
   try {
     const { error: updateError } = await supabaseAdmin.from('users').update({
-      google_sheet_id: sheetId,
-      provisionne:     true,
-      provisionne_at:  new Date().toISOString(),
-      ...(wf2Id !== 'skip' ? { n8n_workflow_ca_id: wf2Id } : {}),
-      ...(wf3Id !== 'skip' ? { n8n_workflow_resume_id: wf3Id } : {}),
+      n8n_workflow_ca_id:     wf2Id,
+      n8n_workflow_resume_id: wf3Id,
+      google_sheet_id:        sheetId,
+      provisionne:            true,
+      provisionne_at:         new Date().toISOString(),
     }).eq('id', userId)
 
     if (updateError) console.error('[PROVISION] Update error:', updateError.message)
 
-    const wfInsert = []
-    if (wf2Id !== 'skip') wfInsert.push({ user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',   actif: true, statut: 'actif', nb_executions_mois: 0 })
-    if (wf3Id !== 'skip') wfInsert.push({ user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA', actif: true, statut: 'actif', nb_executions_mois: 0 })
-    if (wfInsert.length > 0) await supabaseAdmin.from('workflows').insert(wfInsert)
-
+    await supabaseAdmin.from('workflows').insert([
+      { user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',   actif: true, statut: 'actif', nb_executions_mois: 0 },
+      { user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA', actif: true, statut: 'actif', nb_executions_mois: 0 },
+    ])
     console.log('[PROVISION] ✅ Terminé pour', email)
   } catch (e: any) {
     console.error('[PROVISION] Erreur étape 4:', e.message)
