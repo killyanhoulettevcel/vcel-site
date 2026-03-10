@@ -11,20 +11,20 @@ import { supabaseAdmin } from '@/lib/supabase'
 // PROVISIONING_SECRET=un-secret-pour-sécuriser-cet-endpoint
 // ─────────────────────────────────────────────────────────────────────────────
 
-const N8N_URL    = process.env.N8N_URL!
-const N8N_KEY    = process.env.N8N_API_KEY!
-const SECRET     = process.env.PROVISIONING_SECRET!
 
 // ── Helpers n8n API ───────────────────────────────────────────────────────────
-const n8nFetch = (path: string, options: RequestInit = {}) =>
-  fetch(`${N8N_URL}/api/v1${path}`, {
+const n8nFetch = (path: string, options: RequestInit = {}) => {
+  const url = process.env.N8N_URL
+  const key = process.env.N8N_API_KEY
+  if (!url) throw new Error('N8N_URL manquant dans les variables Vercel')
+  return fetch(`${url}/api/v1${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'X-N8N-API-KEY': N8N_KEY,
       ...options.headers,
     },
   })
+}
 
 // ── Créer Google Sheet depuis template ───────────────────────────────────────
 async function createGoogleSheet(clientNom: string, clientEmail: string): Promise<string> {
@@ -299,22 +299,19 @@ async function activateWorkflow(workflowId: string): Promise<void> {
 
 // ── ENDPOINT PRINCIPAL ────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // Vérification secret
+
+  console.log('[PROVISION] ENV CHECK - N8N_URL:', N8N_URL || 'MANQUANT', '| SECRET:', SECRET ? 'OK' : 'MANQUANT')
+
   const secret = req.headers.get('x-provision-secret')
-  const SECRET = process.env.PROVISIONING_SECRET
-  console.log('[PROVISION] Vars - N8N_URL:', process.env.N8N_URL, 'SECRET:', SECRET ? 'present' : 'absent')
   if (secret !== SECRET) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   const { userId, email, nom } = await req.json()
-
-  if (!userId || !email) {
-    return NextResponse.json({ error: 'userId et email requis' }, { status: 400 })
-  }
+  if (!userId || !email) return NextResponse.json({ error: 'userId et email requis' }, { status: 400 })
 
   console.log(`[PROVISION] Démarrage pour ${email} (${userId})`)
 
   // ── Étape 1 : Google Sheet ──────────────────────────────────────────────────
-  let sheetId = ''
+  let sheetId = 'non-cree'
   try {
     console.log('[PROVISION] Étape 1: Google Sheets...')
     sheetId = await createGoogleSheet(nom || email, email)
@@ -324,44 +321,49 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Étape 1 (Google Sheets): ' + e.message, step: 1 }, { status: 500 })
   }
 
-  // ── Étape 2 : VCEL-2 ────────────────────────────────────────────────────────
-  let wf2Id = ''
-  try {
-    console.log('[PROVISION] Étape 2: VCEL-2...')
-    wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
-    await activateWorkflow(wf2Id)
-    console.log('[PROVISION] VCEL-2 OK:', wf2Id)
-  } catch (e: any) {
-    console.error('[PROVISION] Erreur étape 2:', e.message)
-    return NextResponse.json({ error: 'Étape 2 (VCEL-2): ' + e.message, step: 2, sheetId }, { status: 500 })
-  }
+  // ── Étapes 2 & 3 : n8n workflows (skip si N8N_URL absent) ──────────────────
+  let wf2Id = 'skip'
+  let wf3Id = 'skip'
 
-  // ── Étape 3 : VCEL-3 ────────────────────────────────────────────────────────
-  let wf3Id = ''
-  try {
-    console.log('[PROVISION] Étape 3: VCEL-3...')
-    wf3Id = await createWorkflowResume(userId, email, nom || email)
-    await activateWorkflow(wf3Id)
-    console.log('[PROVISION] VCEL-3 OK:', wf3Id)
-  } catch (e: any) {
-    console.error('[PROVISION] Erreur étape 3:', e.message)
-    return NextResponse.json({ error: 'Étape 3 (VCEL-3): ' + e.message, step: 3, sheetId, wf2Id }, { status: 500 })
+  if (N8N_URL && N8N_KEY) {
+    try {
+      console.log('[PROVISION] Étape 2: VCEL-2...')
+      wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
+      await activateWorkflow(wf2Id)
+      console.log('[PROVISION] VCEL-2 OK:', wf2Id)
+    } catch (e: any) {
+      console.error('[PROVISION] Erreur étape 2 (non bloquant):', e.message)
+    }
+
+    try {
+      console.log('[PROVISION] Étape 3: VCEL-3...')
+      wf3Id = await createWorkflowResume(userId, email, nom || email)
+      await activateWorkflow(wf3Id)
+      console.log('[PROVISION] VCEL-3 OK:', wf3Id)
+    } catch (e: any) {
+      console.error('[PROVISION] Erreur étape 3 (non bloquant):', e.message)
+    }
+  } else {
+    console.log('[PROVISION] N8N_URL absent — workflows n8n skippés')
   }
 
   // ── Étape 4 : Supabase ──────────────────────────────────────────────────────
   try {
-    await supabaseAdmin.from('users').update({
-      n8n_workflow_ca_id:     wf2Id,
-      n8n_workflow_resume_id: wf3Id,
-      google_sheet_id:        sheetId,
-      provisionne:            true,
-      provisionne_at:         new Date().toISOString(),
+    const { error: updateError } = await supabaseAdmin.from('users').update({
+      google_sheet_id: sheetId,
+      provisionne:     true,
+      provisionne_at:  new Date().toISOString(),
+      ...(wf2Id !== 'skip' ? { n8n_workflow_ca_id: wf2Id } : {}),
+      ...(wf3Id !== 'skip' ? { n8n_workflow_resume_id: wf3Id } : {}),
     }).eq('id', userId)
 
-    await supabaseAdmin.from('workflows').insert([
-      { user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',     actif: true, statut: 'actif', nb_executions_mois: 0 },
-      { user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA',   actif: true, statut: 'actif', nb_executions_mois: 0 },
-    ])
+    if (updateError) console.error('[PROVISION] Update error:', updateError.message)
+
+    const wfInsert = []
+    if (wf2Id !== 'skip') wfInsert.push({ user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',   actif: true, statut: 'actif', nb_executions_mois: 0 })
+    if (wf3Id !== 'skip') wfInsert.push({ user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA', actif: true, statut: 'actif', nb_executions_mois: 0 })
+    if (wfInsert.length > 0) await supabaseAdmin.from('workflows').insert(wfInsert)
+
     console.log('[PROVISION] ✅ Terminé pour', email)
   } catch (e: any) {
     console.error('[PROVISION] Erreur étape 4:', e.message)
