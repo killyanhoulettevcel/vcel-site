@@ -54,6 +54,7 @@ async function createGoogleSheet(clientNom: string, clientEmail: string): Promis
       },
       body: JSON.stringify({
         name: `VCEL — ${clientNom} (${clientEmail})`,
+        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || ''],
       }),
     }
   )
