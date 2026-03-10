@@ -122,7 +122,6 @@ async function generateGoogleJWT(credentials: any): Promise<string> {
 async function createWorkflowCA(userId: string, sheetId: string, clientNom: string): Promise<string> {
   const workflow = {
     name: `VCEL-2 — CA Sheets → Supabase [${clientNom}]`,
-    active: true,
     nodes: [
       {
         id: `trigger-ca-${userId}`,
@@ -220,7 +219,6 @@ return results;`
 async function createWorkflowResume(userId: string, clientEmail: string, clientNom: string): Promise<string> {
   const workflow = {
     name: `VCEL-3 — Résumé Hebdo IA [${clientNom}]`,
-    active: true,
     nodes: [
       {
         id: `trigger-resume-${userId}`,
