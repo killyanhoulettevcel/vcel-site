@@ -87,6 +87,14 @@ export default function CoachPage() {
         content: data.reply || data.error || 'Erreur de connexion',
         ts: new Date()
       }])
+      // Recharger les objectifs si action effectuée
+      if (data.action === 'objectif_created' || data.action === 'objectif_deleted') {
+        const r = await fetch('/api/objectifs')
+        if (r.ok) {
+          const obj = await r.json()
+          setDashboardData((prev: any) => ({ ...prev, objectifs: obj?.objectifs || [] }))
+        }
+      }
     } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
