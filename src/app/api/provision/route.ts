@@ -44,8 +44,9 @@ async function createGoogleSheet(clientNom: string, clientEmail: string): Promis
 
   // Copier le template Google Sheets
   const templateId = process.env.GOOGLE_SHEETS_TEMPLATE_ID!
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || ''
   const copyRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${templateId}/copy`,
+    `https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`,
     {
       method: 'POST',
       headers: {
@@ -54,7 +55,8 @@ async function createGoogleSheet(clientNom: string, clientEmail: string): Promis
       },
       body: JSON.stringify({
         name: `VCEL — ${clientNom} (${clientEmail})`,
-        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || ''],
+        parents: [folderId],
+        driveId: folderId,
       }),
     }
   )
