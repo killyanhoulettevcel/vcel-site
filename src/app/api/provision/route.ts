@@ -1,227 +1,372 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
-import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+// ─── CONFIGURATION ────────────────────────────────────────────────────────────
+// Ajoute dans .env.local :
+// N8N_URL=https://ton-instance-n8n.railway.app
+// N8N_API_KEY=ton-api-key-n8n (Settings → API → Create API Key)
+// GOOGLE_SERVICE_ACCOUNT_EMAIL=vcel@vcel.iam.gserviceaccount.com
+// GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
+// GOOGLE_SHEETS_TEMPLATE_ID=id-de-ta-feuille-template
+// PROVISIONING_SECRET=un-secret-pour-sécuriser-cet-endpoint
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const userId = (session.user as any).id
-  const notifications: any[] = []
-  const now = new Date()
+const N8N_URL    = process.env.N8N_URL!
+const N8N_KEY    = process.env.N8N_API_KEY!
+const SECRET     = process.env.PROVISIONING_SECRET!
 
-  // ── 1. Leads nouveaux non contactés ──────────────────────────────────────
-  const { data: leads } = await supabaseAdmin
-    .from('leads')
-    .select('id, nom, email, created_at')
-    .eq('user_id', userId)
-    .eq('statut', 'nouveau')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  for (const lead of leads || []) {
-    notifications.push({
-      id:      `lead-${lead.id}`,
-      type:    'lead',
-      titre:   'Nouveau lead',
-      message: `${lead.nom || lead.email} vient de s'inscrire`,
-      date:    lead.created_at,
-      lu:      false,
-      href:    '/dashboard/client/leads',
-    })
-  }
-
-  // ── 2. Factures impayées ─────────────────────────────────────────────────
-  const { data: factures } = await supabaseAdmin
-    .from('factures')
-    .select('id, numero_facture, montant_ttc, statut, created_at')
-    .eq('user_id', userId)
-    .in('statut', ['en attente', 'en retard'])
-    .order('created_at', { ascending: false })
-    .limit(3)
-
-  for (const f of factures || []) {
-    notifications.push({
-      id:      `facture-${f.id}`,
-      type:    f.statut === 'en retard' ? 'erreur' : 'warning',
-      titre:   f.statut === 'en retard' ? 'Facture en retard' : 'Facture en attente',
-      message: `${f.numero_facture} — ${(f.montant_ttc || 0).toLocaleString('fr-FR')}€`,
-      date:    f.created_at,
-      lu:      false,
-      href:    '/dashboard/client/factures',
-    })
-  }
-
-  // ── 3. Workflows en erreur ───────────────────────────────────────────────
-  const { data: workflows } = await supabaseAdmin
-    .from('workflows')
-    .select('id, nom, erreur_message, updated_at')
-    .eq('user_id', userId)
-    .eq('statut', 'erreur')
-    .limit(3)
-
-  for (const w of workflows || []) {
-    notifications.push({
-      id:      `workflow-${w.id}`,
-      type:    'erreur',
-      titre:   'Workflow en erreur',
-      message: `${w.nom}${w.erreur_message ? ' — ' + w.erreur_message : ''}`,
-      date:    w.updated_at,
-      lu:      false,
-      href:    '/dashboard/client/workflows',
-    })
-  }
-
-  // ── 4. DÉTECTION D'ANOMALIES ─────────────────────────────────────────────
-
-  const { data: tousLeads } = await supabaseAdmin
-    .from('leads')
-    .select('id, created_at, statut, score')
-    .eq('user_id', userId)
-
-  const { data: caData } = await supabaseAdmin
-    .from('ca_data')
-    .select('ca_ht, charges, marge, mois, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(3)
-
-  // 4a. Aucun lead depuis 7 jours
-  const il7jours = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const leadsRecents = (tousLeads || []).filter(l => new Date(l.created_at) > il7jours)
-  if ((tousLeads || []).length > 0 && leadsRecents.length === 0) {
-    notifications.push({
-      id:      'anomalie-no-leads',
-      type:    'warning',
-      titre:   '⚠️ Aucun lead depuis 7 jours',
-      message: 'Ton acquisition est au point mort — vérifie tes sources',
-      date:    now.toISOString(),
-      lu:      false,
-      href:    '/dashboard/client/leads',
-      anomalie: true,
-    })
-  }
-
-  // 4b. Chute de CA > 30% vs mois précédent
-  if (caData && caData.length >= 2) {
-    const dernier   = caData[0]
-    const precedent = caData[1]
-    if (precedent.ca_ht > 0) {
-      const chute = (precedent.ca_ht - dernier.ca_ht) / precedent.ca_ht * 100
-      if (chute > 30) {
-        notifications.push({
-          id:      'anomalie-ca-chute',
-          type:    'erreur',
-          titre:   `📉 CA en chute de ${Math.round(chute)}%`,
-          message: `${dernier.mois} : ${dernier.ca_ht}€ vs ${precedent.ca_ht}€ le mois dernier`,
-          date:    now.toISOString(),
-          lu:      false,
-          href:    '/dashboard/client/finances',
-          anomalie: true,
-        })
-      }
-    }
-  }
-
-  // 4c. Taux de conversion faible (< 5% avec plus de 10 leads)
-  const totalLeads     = (tousLeads || []).length
-  const leadsConvertis = (tousLeads || []).filter(l => l.statut === 'converti').length
-  if (totalLeads >= 10 && leadsConvertis / totalLeads < 0.05) {
-    notifications.push({
-      id:      'anomalie-conversion',
-      type:    'warning',
-      titre:   '📊 Taux de conversion faible',
-      message: `${leadsConvertis}/${totalLeads} leads convertis (${Math.round(leadsConvertis / totalLeads * 100)}%)`,
-      date:    now.toISOString(),
-      lu:      false,
-      href:    '/dashboard/client/leads',
-      anomalie: true,
-    })
-  }
-
-  // 4d. Marge négative ce mois
-  if (caData && caData.length > 0 && caData[0].marge < 0) {
-    notifications.push({
-      id:      'anomalie-marge-negative',
-      type:    'erreur',
-      titre:   '🔴 Marge négative ce mois',
-      message: `${caData[0].mois} : marge de ${caData[0].marge}€ — charges > CA`,
-      date:    now.toISOString(),
-      lu:      false,
-      href:    '/dashboard/client/finances',
-      anomalie: true,
-    })
-  }
-
-  // 4e. Leads chauds non traités depuis 48h
-  const il48h = new Date(now.getTime() - 48 * 60 * 60 * 1000)
-  const { data: leadsChaudsAnciens } = await supabaseAdmin
-    .from('leads')
-    .select('id, nom, email, created_at')
-    .eq('user_id', userId)
-    .eq('score', 'chaud')
-    .eq('statut', 'nouveau')
-    .lt('created_at', il48h.toISOString())
-    .limit(3)
-
-  for (const lead of leadsChaudsAnciens || []) {
-    notifications.push({
-      id:      `anomalie-lead-chaud-${lead.id}`,
-      type:    'warning',
-      titre:   '🔥 Lead chaud non contacté',
-      message: `${lead.nom || lead.email} attend depuis plus de 48h`,
-      date:    lead.created_at,
-      lu:      false,
-      href:    '/dashboard/client/leads',
-      anomalie: true,
-    })
-  }
-
-  // 4f. Objectifs en retard (< 50% à mi-mois)
-  const jourDuMois = now.getDate()
-  const joursTotal = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const pctMois    = jourDuMois / joursTotal
-
-  if (pctMois >= 0.5) {
-    const { data: objectifs } = await supabaseAdmin
-      .from('objectifs')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('actif', true)
-      .eq('periode', 'mensuel')
-
-    for (const obj of objectifs || []) {
-      let actuel = 0
-      if (obj.type === 'ca')         actuel = (caData?.[0]?.ca_ht || 0)
-      if (obj.type === 'leads')      actuel = (tousLeads || []).filter((l: any) => {
-        const d = new Date(l.created_at)
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      }).length
-      if (obj.type === 'conversion') actuel = totalLeads > 0 ? Math.round(leadsConvertis / totalLeads * 100) : 0
-
-      const pctObjectif = obj.cible > 0 ? actuel / obj.cible : 1
-      if (pctObjectif < 0.5) {
-        notifications.push({
-          id:      `objectif-${obj.id}`,
-          type:    'warning',
-          titre:   `🎯 Objectif en retard : ${obj.label}`,
-          message: `${actuel}${obj.type === 'ca' ? '€' : obj.type === 'conversion' ? '%' : ''} / ${obj.cible}${obj.type === 'ca' ? '€' : obj.type === 'conversion' ? '%' : ''} — ${Math.round(pctObjectif * 100)}% atteint`,
-          date:    now.toISOString(),
-          lu:      false,
-          href:    '/dashboard/client/objectifs',
-          anomalie: true,
-        })
-      }
-    }
-  }
-
-  // ── Trier : anomalies en premier, puis par date ──────────────────────────
-  notifications.sort((a, b) => {
-    if (a.anomalie && !b.anomalie) return -1
-    if (!a.anomalie && b.anomalie) return 1
-    return new Date(b.date).getTime() - new Date(a.date).getTime()
+// ── Helpers n8n API ───────────────────────────────────────────────────────────
+const n8nFetch = (path: string, options: RequestInit = {}) =>
+  fetch(`${N8N_URL}/api/v1${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-N8N-API-KEY': N8N_KEY,
+      ...options.headers,
+    },
   })
 
-  return NextResponse.json(notifications.slice(0, 15))
+// ── Créer Google Sheet depuis template ───────────────────────────────────────
+async function createGoogleSheet(clientNom: string, clientEmail: string): Promise<string> {
+  // On utilise l'API Google Drive pour copier le template
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}')
+
+  // Obtenir un token d'accès via JWT Service Account
+  const jwt = await generateGoogleJWT(credentials)
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  })
+  const { access_token } = await tokenRes.json()
+
+  // Copier le template Google Sheets
+  const templateId = process.env.GOOGLE_SHEETS_TEMPLATE_ID!
+  const copyRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${templateId}/copy`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: `VCEL — ${clientNom} (${clientEmail})`,
+      }),
+    }
+  )
+  const copyData = await copyRes.json()
+
+  // Partager la feuille avec le client (optionnel)
+  await fetch(
+    `https://www.googleapis.com/drive/v3/files/${copyData.id}/permissions`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'writer',
+        type: 'user',
+        emailAddress: clientEmail,
+      }),
+    }
+  )
+
+  return copyData.id
+}
+
+// ── Générer JWT pour Google Service Account ───────────────────────────────────
+async function generateGoogleJWT(credentials: any): Promise<string> {
+  const now   = Math.floor(Date.now() / 1000)
+  const claim = {
+    iss:   credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets',
+    aud:   'https://oauth2.googleapis.com/token',
+    exp:   now + 3600,
+    iat:   now,
+  }
+
+  const header  = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+  const payload = btoa(JSON.stringify(claim))
+  const input   = `${header}.${payload}`
+
+  // Signer avec la clé privée RSA
+  const keyData = credentials.private_key
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\n/g, '')
+
+  const binaryKey = Uint8Array.from(atob(keyData), c => c.charCodeAt(0))
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', binaryKey,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  )
+
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5', cryptoKey,
+    new TextEncoder().encode(input)
+  )
+
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
+  return `${input}.${sig}`
+}
+
+// ── Créer workflow VCEL-2 dans n8n pour ce client ────────────────────────────
+async function createWorkflowCA(userId: string, sheetId: string, clientNom: string): Promise<string> {
+  const workflow = {
+    name: `VCEL-2 — CA Sheets → Supabase [${clientNom}]`,
+    active: true,
+    nodes: [
+      {
+        id: `trigger-ca-${userId}`,
+        name: 'Déclencheur hebdo',
+        type: 'n8n-nodes-base.scheduleTrigger',
+        typeVersion: 1.1,
+        position: [100, 300],
+        parameters: {
+          rule: { interval: [{ field: 'cronExpression', expression: '0 6 * * 1' }] }
+        }
+      },
+      {
+        id: `sheets-ca-${userId}`,
+        name: 'Lire CA depuis Sheets',
+        type: 'n8n-nodes-base.googleSheets',
+        typeVersion: 4.7,
+        position: [320, 300],
+        parameters: {
+          operation: 'readRows',
+          documentId: { __rl: true, value: sheetId, mode: 'id' },
+          sheetName:  { __rl: true, value: 'CA',    mode: 'name' },
+          options: {}
+        },
+        credentials: { googleSheetsOAuth2Api: { id: process.env.N8N_GOOGLE_CREDENTIAL_ID!, name: 'Google Sheets VCEL' } }
+      },
+      {
+        id: `calcul-ca-${userId}`,
+        name: 'Calculer CA mensuel',
+        type: 'n8n-nodes-base.code',
+        typeVersion: 2,
+        position: [540, 300],
+        parameters: {
+          jsCode: `
+const rows = $input.all().map(i => i.json);
+const userId = '${userId}';
+const results = [];
+
+for (const row of rows) {
+  if (!row.mois || !row.ca_ht) continue;
+  results.push({
+    json: {
+      user_id:  userId,
+      mois:     row.mois,
+      ca_ht:    parseFloat(row.ca_ht || 0),
+      charges:  parseFloat(row.charges || 0),
+      marge:    parseFloat(row.ca_ht || 0) - parseFloat(row.charges || 0),
+    }
+  });
+}
+return results;`
+        }
+      },
+      {
+        id: `supabase-ca-${userId}`,
+        name: 'Upsert Supabase CA',
+        type: 'n8n-nodes-base.httpRequest',
+        typeVersion: 4.4,
+        position: [760, 300],
+        parameters: {
+          url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/ca_data`,
+          method: 'POST',
+          authentication: 'genericCredentialType',
+          genericAuthType: 'httpHeaderAuth',
+          sendHeaders: true,
+          headerParameters: {
+            parameters: [
+              { name: 'apikey',        value: process.env.SUPABASE_SERVICE_ROLE_KEY! },
+              { name: 'Authorization', value: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}` },
+              { name: 'Content-Type',  value: 'application/json' },
+              { name: 'Prefer',        value: 'resolution=merge-duplicates' },
+            ]
+          },
+          sendBody: true,
+          specifyBody: 'json',
+          jsonBody: '={{ JSON.stringify($json) }}',
+          options: {}
+        }
+      }
+    ],
+    connections: {
+      'Déclencheur hebdo':    { main: [[{ node: 'Lire CA depuis Sheets', type: 'main', index: 0 }]] },
+      'Lire CA depuis Sheets':{ main: [[{ node: 'Calculer CA mensuel',   type: 'main', index: 0 }]] },
+      'Calculer CA mensuel':  { main: [[{ node: 'Upsert Supabase CA',    type: 'main', index: 0 }]] },
+    },
+    settings: { executionOrder: 'v1' }
+  }
+
+  const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
+  const data = await res.json()
+  return data.id
+}
+
+// ── Créer workflow VCEL-3 dans n8n pour ce client ────────────────────────────
+async function createWorkflowResume(userId: string, clientEmail: string, clientNom: string): Promise<string> {
+  const workflow = {
+    name: `VCEL-3 — Résumé Hebdo IA [${clientNom}]`,
+    active: true,
+    nodes: [
+      {
+        id: `trigger-resume-${userId}`,
+        name: 'Chaque Lundi 8h',
+        type: 'n8n-nodes-base.scheduleTrigger',
+        typeVersion: 1.1,
+        position: [100, 300],
+        parameters: {
+          rule: { interval: [{ field: 'cronExpression', expression: '0 8 * * 1' }] }
+        }
+      },
+      {
+        id: `fetch-data-${userId}`,
+        name: 'Récupérer données client',
+        type: 'n8n-nodes-base.httpRequest',
+        typeVersion: 4.4,
+        position: [320, 300],
+        parameters: {
+          url: `${process.env.NEXTAUTH_URL}/api/provision/resume-data?userId=${userId}`,
+          method: 'GET',
+          sendHeaders: true,
+          headerParameters: {
+            parameters: [{ name: 'x-provision-secret', value: process.env.PROVISIONING_SECRET! }]
+          },
+          options: {}
+        }
+      },
+      {
+        id: `gpt-resume-${userId}`,
+        name: 'GPT Résumé IA',
+        type: 'n8n-nodes-base.openAi',
+        typeVersion: 1.3,
+        position: [540, 300],
+        parameters: {
+          resource: 'chat',
+          operation: 'complete',
+          modelId: { __rl: true, value: 'gpt-4o-mini', mode: 'list' },
+          messages: {
+            values: [
+              { role: 'system', content: `Tu es le coach business de ${clientNom}. Rédige un résumé hebdomadaire chaleureux et motivant en HTML simple.` },
+              { role: 'user',   content: '={{ JSON.stringify($json) }}' }
+            ]
+          },
+          options: { maxTokens: 600, temperature: 0.8 }
+        },
+        credentials: { openAiApi: { id: process.env.N8N_OPENAI_CREDENTIAL_ID!, name: 'OpenAI VCEL' } }
+      },
+      {
+        id: `gmail-resume-${userId}`,
+        name: 'Envoyer résumé',
+        type: 'n8n-nodes-base.gmail',
+        typeVersion: 2.1,
+        position: [760, 300],
+        parameters: {
+          sendTo:    clientEmail,
+          subject:   `📊 Ton résumé de la semaine — VCEL`,
+          emailType: 'html',
+          message:   '={{ $json.message.content }}',
+          options:   { appendAttribution: false }
+        },
+        credentials: { gmailOAuth2: { id: process.env.N8N_GMAIL_CREDENTIAL_ID!, name: 'Gmail VCEL' } }
+      }
+    ],
+    connections: {
+      'Chaque Lundi 8h':          { main: [[{ node: 'Récupérer données client', type: 'main', index: 0 }]] },
+      'Récupérer données client': { main: [[{ node: 'GPT Résumé IA',            type: 'main', index: 0 }]] },
+      'GPT Résumé IA':            { main: [[{ node: 'Envoyer résumé',           type: 'main', index: 0 }]] },
+    },
+    settings: { executionOrder: 'v1' }
+  }
+
+  const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
+  const data = await res.json()
+  return data.id
+}
+
+// ── Activer un workflow n8n ───────────────────────────────────────────────────
+async function activateWorkflow(workflowId: string): Promise<void> {
+  await n8nFetch(`/workflows/${workflowId}/activate`, { method: 'POST' })
+}
+
+// ── ENDPOINT PRINCIPAL ────────────────────────────────────────────────────────
+export async function POST(req: NextRequest) {
+  // Vérification secret
+  const secret = req.headers.get('x-provision-secret')
+  const SECRET = process.env.PROVISIONING_SECRET
+  console.log('[PROVISION] Vars - N8N_URL:', process.env.N8N_URL, 'SECRET:', SECRET ? 'present' : 'absent')
+  if (secret !== SECRET) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+
+  const { userId, email, nom } = await req.json()
+
+  if (!userId || !email) {
+    return NextResponse.json({ error: 'userId et email requis' }, { status: 400 })
+  }
+
+  console.log(`[PROVISION] Démarrage pour ${email} (${userId})`)
+
+  // ── Étape 1 : Google Sheet ──────────────────────────────────────────────────
+  let sheetId = ''
+  try {
+    console.log('[PROVISION] Étape 1: Google Sheets...')
+    sheetId = await createGoogleSheet(nom || email, email)
+    console.log('[PROVISION] Sheet OK:', sheetId)
+  } catch (e: any) {
+    console.error('[PROVISION] Erreur étape 1:', e.message)
+    return NextResponse.json({ error: 'Étape 1 (Google Sheets): ' + e.message, step: 1 }, { status: 500 })
+  }
+
+  // ── Étape 2 : VCEL-2 ────────────────────────────────────────────────────────
+  let wf2Id = ''
+  try {
+    console.log('[PROVISION] Étape 2: VCEL-2...')
+    wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
+    await activateWorkflow(wf2Id)
+    console.log('[PROVISION] VCEL-2 OK:', wf2Id)
+  } catch (e: any) {
+    console.error('[PROVISION] Erreur étape 2:', e.message)
+    return NextResponse.json({ error: 'Étape 2 (VCEL-2): ' + e.message, step: 2, sheetId }, { status: 500 })
+  }
+
+  // ── Étape 3 : VCEL-3 ────────────────────────────────────────────────────────
+  let wf3Id = ''
+  try {
+    console.log('[PROVISION] Étape 3: VCEL-3...')
+    wf3Id = await createWorkflowResume(userId, email, nom || email)
+    await activateWorkflow(wf3Id)
+    console.log('[PROVISION] VCEL-3 OK:', wf3Id)
+  } catch (e: any) {
+    console.error('[PROVISION] Erreur étape 3:', e.message)
+    return NextResponse.json({ error: 'Étape 3 (VCEL-3): ' + e.message, step: 3, sheetId, wf2Id }, { status: 500 })
+  }
+
+  // ── Étape 4 : Supabase ──────────────────────────────────────────────────────
+  try {
+    await supabaseAdmin.from('users').update({
+      n8n_workflow_ca_id:     wf2Id,
+      n8n_workflow_resume_id: wf3Id,
+      google_sheet_id:        sheetId,
+      provisionne:            true,
+      provisionne_at:         new Date().toISOString(),
+    }).eq('id', userId)
+
+    await supabaseAdmin.from('workflows').insert([
+      { user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',     actif: true, statut: 'actif', nb_executions_mois: 0 },
+      { user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA',   actif: true, statut: 'actif', nb_executions_mois: 0 },
+    ])
+    console.log('[PROVISION] ✅ Terminé pour', email)
+  } catch (e: any) {
+    console.error('[PROVISION] Erreur étape 4:', e.message)
+    return NextResponse.json({ error: 'Étape 4 (Supabase): ' + e.message, step: 4 }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, sheetId, wf2Id, wf3Id, message: `Environnement créé pour ${email}` })
 }
