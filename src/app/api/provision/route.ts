@@ -56,6 +56,7 @@ async function createGoogleSheet(clientNom: string, clientEmail: string): Promis
     }
   )
   const copyData = await copyRes.json()
+  console.log('[GOOGLE] copyData:', JSON.stringify(copyData).substring(0, 200))
 
   // Partager la feuille avec le client (optionnel)
   await fetch(
@@ -208,6 +209,7 @@ return results;`
 
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
+  console.log('[N8N VCEL-2] response:', JSON.stringify(data).substring(0, 200))
   return data.id
 }
 
@@ -289,6 +291,7 @@ async function createWorkflowResume(userId: string, clientEmail: string, clientN
 
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
+  console.log('[N8N VCEL-3] response:', JSON.stringify(data).substring(0, 200))
   return data.id
 }
 
