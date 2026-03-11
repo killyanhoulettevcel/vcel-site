@@ -89,56 +89,180 @@ async function generateGoogleJWT(credentials: any): Promise<string> {
 
 // ── Créer workflow VCEL-2 dans n8n pour ce client ────────────────────────────
 async function createWorkflowCA(userId: string, sheetId: string, clientNom: string): Promise<string> {
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
   const workflow = {
-    name: `VCEL-2 — CA Sheets → Supabase [${clientNom}]`,
-    nodes: [
-      {
-        id: `trigger-ca-${userId}`,
-        name: 'Déclencheur hebdo',
-        type: 'n8n-nodes-base.scheduleTrigger',
-        typeVersion: 1.1,
-        position: [100, 300],
-        parameters: {
-          rule: { interval: [{ field: 'cronExpression', expression: '0 6 * * 1' }] }
+  "name": "VCEL-2 — CA Sheets → Supabase [${clientNom}]",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
         }
       },
-      {
-        id: `sheets-ca-${userId}`,
-        name: 'Lire CA depuis Sheets',
-        type: 'n8n-nodes-base.googleSheets',
-        typeVersion: 4.7,
-        position: [320, 300],
-        parameters: {
-          operation: 'readRows',
-          documentId: { __rl: true, value: sheetId, mode: 'id' },
-          sheetName:  { __rl: true, value: 'CA',    mode: 'name' },
-          options: {}
+      "id": "trigger-ca-${userId}",
+      "name": "Déclencheur hebdo",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "${sheetId}"
         },
-        credentials: { googleSheetsOAuth2Api: { id: process.env.N8N_GOOGLE_CREDENTIAL_ID!, name: 'Google Sheets VCEL' } }
+        "sheetName": {
+          "__rl": true,
+          "value": 2075626985,
+          "mode": "list",
+          "cachedResultName": "dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=2075626985"
+        },
+        "options": {}
       },
-      {
-        id: `calcul-ca-${userId}`,
-        name: 'Calculer CA mensuel',
-        type: 'n8n-nodes-base.code',
-        typeVersion: 2,
-        position: [540, 300],
-        parameters: {
-          jsCode: `
-const rows = $input.all().map(i => i.json);
-const userId = '${userId}';
-const results = [];
-
-for (const row of rows) {
-  if (!row.mois || !row.ca_ht) continue;
-  results.push({
-    json: {
-      user_id:  userId,
-      mois:     row.mois,
-      ca_ht:    parseFloat(row.ca_ht || 0),
-      charges:  parseFloat(row.charges || 0),
-      marge:    parseFloat(row.ca_ht || 0) - parseFloat(row.charges || 0),
+      "id": "sheets-ca-${userId}",
+      "name": "Lire CA depuis Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        320,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6fkxDhYtydoKz0Ww",
+          "name": "sheets_vcel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst userId = '${userId}';\nconst results = [];\n\nfor (const row of rows) {\n  if (!row.mois || !row.ca_ht) continue;\n  results.push({\n    json: {\n      user_id:  userId,\n      mois:     row.mois,\n      ca_ht:    parseFloat(row.ca_ht || 0),\n      charges:  parseFloat(row.charges_total || 0),\n      marge:    parseFloat(row.marge_brute || 0),\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "calcul-ca-${userId}",
+      "name": "Calculer CA mensuel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rvgkzyafgqitmhuyvznh.supabase.co/rest/v1/ca_data",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "${supabaseKey}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer ${supabaseKey}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "user_id",
+              "value": "={{ $json.user_id }}"
+            },
+            {
+              "name": "mois",
+              "value": "={{ $json.mois }}"
+            },
+            {
+              "name": "ca_ht",
+              "value": "={{ $json.ca_ht }}"
+            },
+            {
+              "name": "charges",
+              "value": "={{ $json.charges }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "supabase-ca-${userId}",
+      "name": "Upsert Supabase CA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        304
+      ]
     }
-  });
+  ],
+  "connections": {
+    "Déclencheur hebdo": {
+      "main": [
+        [
+          {
+            "node": "Lire CA depuis Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire CA depuis Sheets": {
+      "main": [
+        [
+          {
+            "node": "Calculer CA mensuel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer CA mensuel": {
+      "main": [
+        [
+          {
+            "node": "Upsert Supabase CA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
+  workflow.name = `VCEL-2 — CA Sheets → Supabase [${clientNom}]`
+
+  const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
+  const data = await res.json()
+  console.log('[N8N VCEL-2] response:', JSON.stringify(data).substring(0, 200))
+  return data.id
 }
 return results;`
         }
@@ -148,32 +272,36 @@ return results;`
         name: 'Upsert Supabase CA',
         type: 'n8n-nodes-base.httpRequest',
         typeVersion: 4.4,
-        position: [760, 300],
+        position: [768, 304],
         parameters: {
-          url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/ca_data`,
           method: 'POST',
-          authentication: 'genericCredentialType',
-          genericAuthType: 'httpHeaderAuth',
+          url: `${supabaseUrl}/rest/v1/ca_data`,
           sendHeaders: true,
           headerParameters: {
             parameters: [
-              { name: 'apikey',        value: process.env.SUPABASE_SERVICE_ROLE_KEY! },
-              { name: 'Authorization', value: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}` },
+              { name: 'apikey',        value: supabaseKey },
+              { name: 'Authorization', value: `Bearer ${supabaseKey}` },
               { name: 'Content-Type',  value: 'application/json' },
               { name: 'Prefer',        value: 'resolution=merge-duplicates' },
             ]
           },
           sendBody: true,
-          specifyBody: 'json',
-          jsonBody: '={{ JSON.stringify($json) }}',
+          bodyParameters: {
+            parameters: [
+              { name: 'user_id', value: '={ $json.user_id }' },
+              { name: 'mois',    value: '={ $json.mois }' },
+              { name: 'ca_ht',   value: '={ $json.ca_ht }' },
+              { name: 'charges', value: '={ $json.charges }' },
+            ]
+          },
           options: {}
         }
       }
     ],
     connections: {
-      'Déclencheur hebdo':    { main: [[{ node: 'Lire CA depuis Sheets', type: 'main', index: 0 }]] },
-      'Lire CA depuis Sheets':{ main: [[{ node: 'Calculer CA mensuel',   type: 'main', index: 0 }]] },
-      'Calculer CA mensuel':  { main: [[{ node: 'Upsert Supabase CA',    type: 'main', index: 0 }]] },
+      'Déclencheur hebdo':     { main: [[{ node: 'Lire CA depuis Sheets', type: 'main', index: 0 }]] },
+      'Lire CA depuis Sheets': { main: [[{ node: 'Calculer CA mensuel',   type: 'main', index: 0 }]] },
+      'Calculer CA mensuel':   { main: [[{ node: 'Upsert Supabase CA',    type: 'main', index: 0 }]] },
     },
     settings: { executionOrder: 'v1' }
   }
