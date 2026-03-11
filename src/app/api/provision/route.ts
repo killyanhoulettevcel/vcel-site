@@ -116,6 +116,7 @@ async function createWorkflowResume(userId: string, clientNom: string, clientEma
     .replace(/Killyan Houlette/g, clientNom.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "))
     .replace(/killyan\.houlette@vcel\.fr/g, clientEmail)
     .replace(/vcel-site-gpg3\.vercel\.app/g, nextauthUrl.replace("https://", ""))
+    .replace(/vcel-site-8nbh\.vercel\.app/g, nextauthUrl.replace("https://", ""))
     .replace(/vcel-site\.vercel\.app/g, nextauthUrl.replace("https://", ""))
     .replace(/vcel2024xK9mP3qR7nL2wT8/g, provisionSecret)
   const workflow = JSON.parse(wfStr)
