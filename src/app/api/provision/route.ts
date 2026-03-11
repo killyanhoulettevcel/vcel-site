@@ -101,6 +101,8 @@ async function createWorkflowCA(userId: string, sheetId: string, clientNom: stri
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
   console.log('[N8N VCEL-2] response:', JSON.stringify(data).substring(0, 200))
+  // Activer le workflow
+  await n8nFetch('/workflows/' + data.id + '/activate', { method: 'POST' })
   return data.id
 }
 
@@ -120,6 +122,8 @@ async function createWorkflowResume(userId: string, clientNom: string, clientEma
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
   console.log('[N8N VCEL-3] response:', JSON.stringify(data).substring(0, 200))
+  // Activer le workflow
+  await n8nFetch('/workflows/' + data.id + '/activate', { method: 'POST' })
   return data.id
 }
 
