@@ -28,59 +28,24 @@ const n8nFetch = (path: string, options: RequestInit = {}) => {
   })
 }
 
-// ── Créer Google Sheet depuis template ───────────────────────────────────────
+// ── Créer Google Sheet via webhook n8n VCEL-0 ────────────────────────────────
 async function createGoogleSheet(clientNom: string, clientEmail: string): Promise<string> {
-  // On utilise l'API Google Drive pour copier le template
-  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}')
+  const webhookUrl = process.env.N8N_WEBHOOK_CREATE_SHEET
+  if (!webhookUrl) throw new Error('N8N_WEBHOOK_CREATE_SHEET manquant dans les variables Vercel')
 
-  // Obtenir un token d'accès via JWT Service Account
-  const jwt = await generateGoogleJWT(credentials)
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+  const res = await fetch(webhookUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nom: clientNom, email: clientEmail }),
   })
-  const { access_token } = await tokenRes.json()
 
-  // Copier le template Google Sheets
-  const templateId = process.env.GOOGLE_SHEETS_TEMPLATE_ID!
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || ''
-  const copyRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: `VCEL — ${clientNom} (${clientEmail})`,
-        parents: [folderId],
-        driveId: folderId,
-      }),
-    }
-  )
-  const copyData = await copyRes.json()
-  console.log('[GOOGLE] copyData:', JSON.stringify(copyData).substring(0, 200))
+  if (!res.ok) throw new Error(`Webhook VCEL-0 erreur: ${res.status}`)
 
-  // Partager la feuille avec le client (optionnel)
-  await fetch(
-    `https://www.googleapis.com/drive/v3/files/${copyData.id}/permissions`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        role: 'writer',
-        type: 'user',
-        emailAddress: clientEmail,
-      }),
-    }
-  )
+  const data = await res.json()
+  console.log('[VCEL-0] response:', JSON.stringify(data).substring(0, 200))
 
-  return copyData.id
+  if (!data.sheetId) throw new Error('sheetId manquant dans la réponse VCEL-0')
+  return data.sheetId
 }
 
 // ── Générer JWT pour Google Service Account ───────────────────────────────────
