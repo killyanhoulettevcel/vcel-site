@@ -128,6 +128,11 @@ async function createWorkflowResume(userId: string, clientNom: string, clientEma
 
 
 
+// ── Activer un workflow n8n ───────────────────────────────────────────────────
+async function activateWorkflow(workflowId: string): Promise<void> {
+  await n8nFetch('/workflows/' + workflowId + '/activate', { method: 'POST', body: '{}' })
+}
+
 export async function POST(req: NextRequest) {
   const N8N_URL = process.env.N8N_URL
   const N8N_KEY = process.env.N8N_API_KEY
