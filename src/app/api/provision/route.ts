@@ -44,8 +44,9 @@ async function createGoogleSheet(clientNom: string, clientEmail: string): Promis
   const data = await res.json()
   console.log('[VCEL-0] response:', JSON.stringify(data).substring(0, 200))
 
-  if (!data.sheetId) throw new Error('sheetId manquant dans la réponse VCEL-0')
-  return data.sheetId
+  const sheetId = data.sheetId || data.id
+  if (!sheetId) throw new Error('sheetId manquant dans la réponse VCEL-0')
+  return sheetId
 }
 
 // ── Générer JWT pour Google Service Account ───────────────────────────────────
