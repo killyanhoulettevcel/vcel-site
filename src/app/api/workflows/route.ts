@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     .from('workflows')
     .select('id, workflow_id, nom, actif, statut, nb_executions_mois, derniere_execution, erreur_message')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+    .order('updated_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
