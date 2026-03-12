@@ -1,22 +1,49 @@
+// src/app/api/ca/route.ts
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { sheetsUpsert, getUserSheetId } from '@/lib/googleSheets'
+
+// Colonnes onglet "dashboard" :
+// mois, ca_ht, charges_total, marge_brute, taux_charges, tva_collectee,
+// tva_deductible, tva_solde, projection_fin_mois, nb_factures, nb_charges, numero_trimestre
+
+async function syncToSheet(userId: string, row: any) {
+  try {
+    const sheetId = await getUserSheetId(supabaseAdmin, userId)
+    if (!sheetId) return
+    const caHt     = parseFloat(row.ca_ht)    || 0
+    const charges  = parseFloat(row.charges)  || 0
+    const marge    = caHt - charges
+    const taux     = caHt > 0 ? Math.round(charges / caHt * 100) : 0
+    const tva      = Math.round(caHt * 0.2)
+    await sheetsUpsert(sheetId, 'dashboard', 'A', row.mois, [
+      row.mois,        // mois
+      caHt,            // ca_ht
+      charges,         // charges_total
+      marge,           // marge_brute
+      taux,            // taux_charges
+      tva,             // tva_collectee
+      0,               // tva_deductible
+      tva,             // tva_solde
+      caHt,            // projection_fin_mois
+      row.nb_factures || 0, // nb_factures
+      0,               // nb_charges
+      Math.ceil(new Date().getMonth() / 3), // numero_trimestre
+    ])
+  } catch (e) {
+    console.error('[CA] Erreur sync Sheets:', e)
+  }
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
-
   const userId = (session.user as any).id
   const role   = (session.user as any).role
-
-  let query = supabaseAdmin
-    .from('ca_data')
-    .select('*')
-    .order('created_at', { ascending: true })
-
+  let query = supabaseAdmin.from('ca_data').select('*').order('created_at', { ascending: true })
   if (role !== 'admin') query = query.eq('user_id', userId)
-
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
@@ -25,10 +52,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
-
   const userId = (session.user as any).id
   const body   = await req.json()
-
   const { data, error } = await supabaseAdmin
     .from('ca_data')
     .insert({
@@ -41,25 +66,23 @@ export async function POST(req: NextRequest) {
     })
     .select()
     .single()
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Sync Google Sheets (non bloquant)
+  syncToSheet(userId, data)
   return NextResponse.json(data, { status: 201 })
 }
 
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
-
   const userId = (session.user as any).id
   const body   = await req.json()
   const { id, ...updates } = body
-
   if (updates.ca !== undefined || updates.charges !== undefined) {
     updates.ca_ht  = parseFloat(updates.ca) || 0
     updates.marge  = (parseFloat(updates.ca) || 0) - (parseFloat(updates.charges) || 0)
     delete updates.ca
   }
-
   const { data, error } = await supabaseAdmin
     .from('ca_data')
     .update(updates)
@@ -67,25 +90,20 @@ export async function PUT(req: NextRequest) {
     .eq('user_id', userId)
     .select()
     .single()
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Sync Google Sheets (non bloquant)
+  syncToSheet(userId, data)
   return NextResponse.json(data)
 }
 
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
-
   const userId = (session.user as any).id
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
-
   const { error } = await supabaseAdmin
-    .from('ca_data')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', userId)
-
+    .from('ca_data').delete().eq('id', id).eq('user_id', userId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }
