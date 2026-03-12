@@ -7,7 +7,7 @@ interface Workflow {
   id: string
   nom: string
   actif: boolean
-  statut: 'actif' | 'erreur' | 'inactif'
+  statut: 'ok' | 'erreur' | 'inactif'
   nb_executions_mois: number
   derniere_execution?: string
   erreur_message?: string
@@ -44,8 +44,8 @@ function WorkflowDots({ workflows }: { workflows?: Workflow[] }) {
       {workflows.map(w => (
         <div key={w.id} title={`${w.nom}${w.erreur_message ? ' — ' + w.erreur_message : ''}`}
           className={`w-2 h-2 rounded-full ${
-            w.statut === 'actif'   ? 'bg-green-400' :
-            w.statut === 'erreur'  ? 'bg-red-400 animate-pulse' :
+            w.statut === 'ok'     ? 'bg-green-400' :
+            w.statut === 'erreur' ? 'bg-red-400 animate-pulse' :
             'bg-white/15'
           }`} />
       ))}
@@ -64,12 +64,12 @@ function WorkflowDetail({ workflows }: { workflows?: Workflow[] }) {
     <div className="grid grid-cols-2 gap-2 mt-3">
       {workflows.map(w => (
         <div key={w.id} className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${
-          w.statut === 'erreur'  ? 'bg-red-500/8 border-red-500/20' :
-          w.statut === 'actif'   ? 'bg-green-500/5 border-green-500/15' :
+          w.statut === 'erreur' ? 'bg-red-500/8 border-red-500/20' :
+          w.statut === 'ok'     ? 'bg-green-500/5 border-green-500/15' :
           'bg-white/3 border-white/8'
         }`}>
           <div className={`w-1.5 h-1.5 rounded-full mt-0.5 shrink-0 ${
-            w.statut === 'actif'  ? 'bg-green-400' :
+            w.statut === 'ok'     ? 'bg-green-400' :
             w.statut === 'erreur' ? 'bg-red-400 animate-pulse' :
             'bg-white/20'
           }`} />
@@ -118,11 +118,11 @@ export default function AdminDashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  const actifs      = clients.filter(c => c.statut === 'actif').length
-  const mrr         = actifs * 49
-  const totalLeads  = clients.reduce((s, c) => s + (c.leads || 0), 0)
-  const totalWf     = clients.reduce((s, c) => s + (c.workflows_actifs || 0), 0)
-  const wfEnErreur  = clients.reduce((s, c) =>
+  const actifs     = clients.filter(c => c.statut === 'actif').length
+  const mrr        = actifs * 49
+  const totalLeads = clients.reduce((s, c) => s + (c.leads || 0), 0)
+  const totalWf    = clients.reduce((s, c) => s + (c.workflows?.filter(w => w.statut === 'ok').length || 0), 0)
+  const wfEnErreur = clients.reduce((s, c) =>
     s + (c.workflows?.filter(w => w.statut === 'erreur').length || 0), 0)
 
   const mrrData = clients.length > 0 ? [
@@ -135,10 +135,10 @@ export default function AdminDashboard() {
   ] : []
 
   const kpis = [
-    { label: 'Clients actifs',    value: String(actifs),     sub: `${clients.length} total`,          icon: Users,     color: 'blue' },
-    { label: 'MRR',               value: `${mrr}€`,          sub: `${actifs} × 49€/mois`,             icon: Euro,      color: 'green' },
-    { label: 'Leads générés',     value: String(totalLeads), sub: 'tous clients confondus',            icon: TrendingUp, color: 'purple' },
-    { label: 'Workflows actifs',  value: `${totalWf}`,       sub: `${wfEnErreur} en erreur`,           icon: Zap,       color: wfEnErreur > 0 ? 'orange' : 'blue' },
+    { label: 'Clients actifs',   value: String(actifs),     sub: `${clients.length} total`,         icon: Users,      color: 'blue'   },
+    { label: 'MRR',              value: `${mrr}€`,          sub: `${actifs} × 49€/mois`,            icon: Euro,       color: 'green'  },
+    { label: 'Leads générés',    value: String(totalLeads), sub: 'tous clients confondus',           icon: TrendingUp, color: 'purple' },
+    { label: 'Workflows actifs', value: `${totalWf}`,       sub: `${wfEnErreur} en erreur`,         icon: Zap,        color: wfEnErreur > 0 ? 'orange' : 'blue' },
   ]
 
   return (
@@ -240,44 +240,37 @@ export default function AdminDashboard() {
         ) : (
           <div className="space-y-1">
             {clients.map((c) => {
-              const isOpen       = expanded === c.id
-              const erreurs      = c.workflows?.filter(w => w.statut === 'erreur').length || 0
-              const actifCount   = c.workflows?.filter(w => w.statut === 'actif').length || 0
+              const isOpen     = expanded === c.id
+              const erreurs    = c.workflows?.filter(w => w.statut === 'erreur').length || 0
+              const actifCount = c.workflows?.filter(w => w.statut === 'ok').length || 0
 
               return (
                 <div key={c.id} className={`border rounded-xl overflow-hidden transition-all ${
                   erreurs > 0 ? 'border-red-500/20' : 'border-white/5'
                 }`}>
-                  {/* Ligne principale */}
                   <div
                     className="flex items-center gap-4 p-4 hover:bg-white/2 cursor-pointer transition-colors"
                     onClick={() => setExpanded(isOpen ? null : c.id)}>
 
-                    {/* Avatar */}
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xs font-bold shrink-0">
                       {(c.nom || c.email).charAt(0).toUpperCase()}
                     </div>
 
-                    {/* Nom / email */}
                     <div className="min-w-0 w-40 shrink-0">
                       <p className="text-white text-xs font-medium truncate">{c.nom || '—'}</p>
                       <p className="text-white/30 text-xs truncate">{c.email}</p>
                     </div>
 
-                    {/* Secteur */}
                     <p className="text-white/40 text-xs w-28 shrink-0 hidden md:block">{c.secteur}</p>
 
-                    {/* CA */}
                     <p className="text-white text-xs font-semibold w-20 shrink-0 hidden lg:block">
                       {c.ca_dernier > 0 ? `${c.ca_dernier.toLocaleString('fr-FR')}€` : '—'}
                     </p>
 
-                    {/* Workflows dots */}
                     <div className="flex-1">
                       <WorkflowDots workflows={c.workflows} />
                     </div>
 
-                    {/* Statut workflows résumé */}
                     <div className="flex items-center gap-2 shrink-0">
                       {erreurs > 0 ? (
                         <span className="flex items-center gap-1 text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
@@ -292,18 +285,15 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    {/* Statut compte */}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
                       c.statut === 'actif' ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'
                     }`}>{c.statut}</span>
 
-                    {/* Chevron */}
                     <div className="text-white/20 shrink-0">
                       {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </div>
                   </div>
 
-                  {/* Détail workflows */}
                   {isOpen && (
                     <div className="px-4 pb-4 border-t border-white/5 pt-3">
                       <p className="text-white/30 text-xs mb-2 font-medium uppercase tracking-wide">Détail workflows</p>
