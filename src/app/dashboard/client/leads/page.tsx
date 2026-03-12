@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check, Search, RefreshCw, Download } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
-import ImportCSV from '@/components/ImportCSV'
 
 interface Lead {
   id: string
@@ -108,10 +107,6 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Import CSV */}
-      <div className="mb-8">
-        <ImportCSV onSuccess={refresh} />
-      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
