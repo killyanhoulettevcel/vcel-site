@@ -8,10 +8,66 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   const userId = (session.user as any).id
+  const role   = (session.user as any).role
   const notifications: any[] = []
   const now = new Date()
 
-  // ── 1. Leads nouveaux non contactés ──────────────────────────────────────
+  // ══════════════════════════════════════════════════════
+  // NOTIFS ADMIN — workflows en panne chez les clients
+  // ══════════════════════════════════════════════════════
+  if (role === 'admin') {
+    const { data: wfEnErreur } = await supabaseAdmin
+      .from('workflows')
+      .select('id, nom, erreur_message, updated_at, user_id, users!inner(nom, email)')
+      .eq('statut', 'erreur')
+      .order('updated_at', { ascending: false })
+      .limit(10)
+
+    for (const w of wfEnErreur || []) {
+      const client = (w as any).users
+      notifications.push({
+        id:      `admin-wf-erreur-${w.id}`,
+        type:    'erreur',
+        titre:   `Workflow en panne — ${client?.nom || client?.email || 'Client'}`,
+        message: `${w.nom}${w.erreur_message ? ' : ' + w.erreur_message : ''}`,
+        date:    w.updated_at,
+        lu:      false,
+        href:    '/dashboard/admin',
+      })
+    }
+
+    // Workflows inactifs depuis > 7 jours alors qu'ils devraient tourner
+    const il7jours = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const { data: wfInactifs } = await supabaseAdmin
+      .from('workflows')
+      .select('id, nom, derniere_execution, updated_at, user_id, users!inner(nom, email)')
+      .eq('actif', true)
+      .or(`derniere_execution.lt.${il7jours.toISOString()},derniere_execution.is.null`)
+      .order('updated_at', { ascending: false })
+      .limit(5)
+
+    for (const w of wfInactifs || []) {
+      const client = (w as any).users
+      notifications.push({
+        id:      `admin-wf-inactif-${w.id}`,
+        type:    'warning',
+        titre:   `Workflow sans exécution — ${client?.nom || client?.email || 'Client'}`,
+        message: `${w.nom} — aucune exécution depuis 7+ jours`,
+        date:    w.updated_at || now.toISOString(),
+        lu:      false,
+        href:    '/dashboard/admin',
+      })
+    }
+
+    notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return NextResponse.json(notifications.slice(0, 15))
+  }
+
+  // ══════════════════════════════════════════════════════
+  // NOTIFS CLIENT (code existant)
+  // ══════════════════════════════════════════════════════
+
+  // 1. Leads nouveaux non contactés
   const { data: leads } = await supabaseAdmin
     .from('leads')
     .select('id, nom, email, created_at')
@@ -32,7 +88,7 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── 2. Factures impayées ─────────────────────────────────────────────────
+  // 2. Factures impayées
   const { data: factures } = await supabaseAdmin
     .from('factures')
     .select('id, numero_facture, montant_ttc, statut, created_at')
@@ -53,7 +109,7 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── 3. Workflows en erreur ───────────────────────────────────────────────
+  // 3. Workflows en erreur
   const { data: workflows } = await supabaseAdmin
     .from('workflows')
     .select('id, nom, erreur_message, updated_at')
@@ -73,8 +129,7 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── 4. DÉTECTION D'ANOMALIES ─────────────────────────────────────────────
-
+  // 4. Anomalies
   const { data: tousLeads } = await supabaseAdmin
     .from('leads')
     .select('id, created_at, statut, score')
@@ -92,131 +147,96 @@ export async function GET(req: NextRequest) {
   const leadsRecents = (tousLeads || []).filter(l => new Date(l.created_at) > il7jours)
   if ((tousLeads || []).length > 0 && leadsRecents.length === 0) {
     notifications.push({
-      id:      'anomalie-no-leads',
-      type:    'warning',
-      titre:   '⚠️ Aucun lead depuis 7 jours',
+      id: 'anomalie-no-leads', type: 'warning', anomalie: true,
+      titre: '⚠️ Aucun lead depuis 7 jours',
       message: 'Ton acquisition est au point mort — vérifie tes sources',
-      date:    now.toISOString(),
-      lu:      false,
-      href:    '/dashboard/client/leads',
-      anomalie: true,
+      date: now.toISOString(), lu: false, href: '/dashboard/client/leads',
     })
   }
 
-  // 4b. Chute de CA > 30% vs mois précédent
+  // 4b. Chute de CA > 30%
   if (caData && caData.length >= 2) {
-    const dernier   = caData[0]
-    const precedent = caData[1]
+    const dernier = caData[0], precedent = caData[1]
     if (precedent.ca_ht > 0) {
       const chute = (precedent.ca_ht - dernier.ca_ht) / precedent.ca_ht * 100
       if (chute > 30) {
         notifications.push({
-          id:      'anomalie-ca-chute',
-          type:    'erreur',
-          titre:   `📉 CA en chute de ${Math.round(chute)}%`,
-          message: `${dernier.mois} : ${dernier.ca_ht}€ vs ${precedent.ca_ht}€ le mois dernier`,
-          date:    now.toISOString(),
-          lu:      false,
-          href:    '/dashboard/client/finances',
-          anomalie: true,
+          id: 'anomalie-ca-chute', type: 'erreur', anomalie: true,
+          titre: `📉 CA en chute de ${Math.round(chute)}%`,
+          message: `${dernier.mois} : ${dernier.ca_ht}€ vs ${precedent.ca_ht}€`,
+          date: now.toISOString(), lu: false, href: '/dashboard/client/finances',
         })
       }
     }
   }
 
-  // 4c. Taux de conversion faible (< 5% avec plus de 10 leads)
-  const totalLeads     = (tousLeads || []).length
+  // 4c. Taux de conversion faible
+  const totalLeads = (tousLeads || []).length
   const leadsConvertis = (tousLeads || []).filter(l => l.statut === 'converti').length
   if (totalLeads >= 10 && leadsConvertis / totalLeads < 0.05) {
     notifications.push({
-      id:      'anomalie-conversion',
-      type:    'warning',
-      titre:   '📊 Taux de conversion faible',
+      id: 'anomalie-conversion', type: 'warning', anomalie: true,
+      titre: '📊 Taux de conversion faible',
       message: `${leadsConvertis}/${totalLeads} leads convertis (${Math.round(leadsConvertis / totalLeads * 100)}%)`,
-      date:    now.toISOString(),
-      lu:      false,
-      href:    '/dashboard/client/leads',
-      anomalie: true,
+      date: now.toISOString(), lu: false, href: '/dashboard/client/leads',
     })
   }
 
-  // 4d. Marge négative ce mois
+  // 4d. Marge négative
   if (caData && caData.length > 0 && caData[0].marge < 0) {
     notifications.push({
-      id:      'anomalie-marge-negative',
-      type:    'erreur',
-      titre:   '🔴 Marge négative ce mois',
-      message: `${caData[0].mois} : marge de ${caData[0].marge}€ — charges > CA`,
-      date:    now.toISOString(),
-      lu:      false,
-      href:    '/dashboard/client/finances',
-      anomalie: true,
+      id: 'anomalie-marge-negative', type: 'erreur', anomalie: true,
+      titre: '🔴 Marge négative ce mois',
+      message: `${caData[0].mois} : marge de ${caData[0].marge}€`,
+      date: now.toISOString(), lu: false, href: '/dashboard/client/finances',
     })
   }
 
-  // 4e. Leads chauds non traités depuis 48h
+  // 4e. Leads chauds non traités 48h
   const il48h = new Date(now.getTime() - 48 * 60 * 60 * 1000)
   const { data: leadsChaudsAnciens } = await supabaseAdmin
     .from('leads')
     .select('id, nom, email, created_at')
-    .eq('user_id', userId)
-    .eq('score', 'chaud')
-    .eq('statut', 'nouveau')
-    .lt('created_at', il48h.toISOString())
-    .limit(3)
+    .eq('user_id', userId).eq('score', 'chaud').eq('statut', 'nouveau')
+    .lt('created_at', il48h.toISOString()).limit(3)
 
   for (const lead of leadsChaudsAnciens || []) {
     notifications.push({
-      id:      `anomalie-lead-chaud-${lead.id}`,
-      type:    'warning',
-      titre:   '🔥 Lead chaud non contacté',
+      id: `anomalie-lead-chaud-${lead.id}`, type: 'warning', anomalie: true,
+      titre: '🔥 Lead chaud non contacté',
       message: `${lead.nom || lead.email} attend depuis plus de 48h`,
-      date:    lead.created_at,
-      lu:      false,
-      href:    '/dashboard/client/leads',
-      anomalie: true,
+      date: lead.created_at, lu: false, href: '/dashboard/client/leads',
     })
   }
 
-  // 4f. Objectifs en retard (< 50% à mi-mois)
+  // 4f. Objectifs en retard
   const jourDuMois = now.getDate()
   const joursTotal = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const pctMois    = jourDuMois / joursTotal
-
-  if (pctMois >= 0.5) {
+  if (jourDuMois / joursTotal >= 0.5) {
     const { data: objectifs } = await supabaseAdmin
-      .from('objectifs')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('actif', true)
-      .eq('periode', 'mensuel')
+      .from('objectifs').select('*')
+      .eq('user_id', userId).eq('actif', true).eq('periode', 'mensuel')
 
     for (const obj of objectifs || []) {
       let actuel = 0
-      if (obj.type === 'ca')         actuel = (caData?.[0]?.ca_ht || 0)
+      if (obj.type === 'ca')         actuel = caData?.[0]?.ca_ht || 0
       if (obj.type === 'leads')      actuel = (tousLeads || []).filter((l: any) => {
         const d = new Date(l.created_at)
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
       }).length
       if (obj.type === 'conversion') actuel = totalLeads > 0 ? Math.round(leadsConvertis / totalLeads * 100) : 0
-
       const pctObjectif = obj.cible > 0 ? actuel / obj.cible : 1
       if (pctObjectif < 0.5) {
         notifications.push({
-          id:      `objectif-${obj.id}`,
-          type:    'warning',
-          titre:   `🎯 Objectif en retard : ${obj.label}`,
-          message: `${actuel}${obj.type === 'ca' ? '€' : obj.type === 'conversion' ? '%' : ''} / ${obj.cible}${obj.type === 'ca' ? '€' : obj.type === 'conversion' ? '%' : ''} — ${Math.round(pctObjectif * 100)}% atteint`,
-          date:    now.toISOString(),
-          lu:      false,
-          href:    '/dashboard/client/objectifs',
-          anomalie: true,
+          id: `objectif-${obj.id}`, type: 'warning', anomalie: true,
+          titre: `🎯 Objectif en retard : ${obj.label}`,
+          message: `${actuel} / ${obj.cible} — ${Math.round(pctObjectif * 100)}% atteint`,
+          date: now.toISOString(), lu: false, href: '/dashboard/client/objectifs',
         })
       }
     }
   }
 
-  // ── Trier : anomalies en premier, puis par date ──────────────────────────
   notifications.sort((a, b) => {
     if (a.anomalie && !b.anomalie) return -1
     if (!a.anomalie && b.anomalie) return 1
