@@ -4,72 +4,63 @@ import { Plus, Minus } from 'lucide-react'
 
 const faqs = [
   {
-    q: "Je n'ai pas n8n, comment ça marche ?",
-    a: "Vous n'avez pas besoin de l'installer vous-même. On vous envoie un guide pour déployer n8n en 10 min sur Railway (gratuit jusqu'à 500 exécutions/mois) ou n8n Cloud. Les JSON se collent directement dans l'interface."
-  },
-  {
-    q: "C'est quoi la réforme PDP 2026 ?",
-    a: "À partir de septembre 2026, toutes les factures B2B en France devront passer par une Plateforme de Dématérialisation Partenaire. Notre workflow Devis/Factures est déjà conforme et vous évite une amende de 15€ par facture non conforme."
+    q: "Qu'est-ce que VCEL exactement ?",
+    a: "VCEL est un outil SaaS qui connecte vos données business (CA, leads, factures) à un dashboard et un coach IA. Nous configurons les automatisations n8n pour vous — vous n'avez pas à le faire vous-même."
   },
   {
     q: "Faut-il des compétences techniques ?",
-    a: "Non. Chaque workflow est livré avec une vidéo setup de 2 minutes. Vous collez le JSON dans n8n, entrez vos credentials (Google, Stripe, Gmail) et c'est actif. Aucune ligne de code à écrire."
+    a: "Non. La configuration est incluse dans l'abonnement. Vous accédez à votre dashboard via un navigateur. Seule la connexion à vos outils Google (Sheets, Gmail) est nécessaire."
   },
   {
-    q: "Et si un workflow ne fonctionne pas chez moi ?",
-    a: "On répond sous 48h par email. Si après 7 jours un workflow du pack ne tourne pas dans votre environnement, on vous rembourse intégralement."
+    q: "Combien de temps avant que ça soit opérationnel ?",
+    a: "24 à 48h en général. Après le paiement, vous recevez un email d'activation. On configure votre espace et on vous envoie le lien une fois prêt."
   },
   {
-    q: "Puis-je modifier les workflows à ma sauce ?",
-    a: "Oui, 100%. Les JSON sont open, vous les adaptez librement dans n8n. On livre une base solide, vous customisez selon vos besoins."
+    q: "Mes données sont-elles en sécurité ?",
+    a: "Vos données financières restent dans votre propre Google Sheets. Notre base de données (Supabase) est hébergée en Europe, chiffrée au repos et en transit. Vous restez propriétaire de vos données."
   },
   {
-    q: "Qu'est-ce que le code SOLO19 ?",
-    a: "C'est un code de lancement qui réduit votre premier mois de 49€ à 19€. Applicable directement au checkout Stripe. Sans engagement, vous annulez quand vous voulez."
+    q: "Que se passe-t-il si je résilie ?",
+    a: "Vous pouvez résilier à tout moment depuis votre espace client ou en nous contactant. Votre accès est maintenu jusqu'à la fin de la période payée. Vos données Google Sheets restent les vôtres."
+  },
+  {
+    q: "Le coach IA donne des conseils financiers certifiés ?",
+    a: "Non. Le coach IA est un outil d'aide à la décision basé sur vos propres données. Il ne remplace pas un expert-comptable ou un conseiller financier. Pour des décisions importantes, consultez un professionnel."
+  },
+  {
+    q: "C'est quoi le code SOLO19 ?",
+    a: "Un code promotionnel de lancement qui réduit votre premier mois de 49€ à 19€. Il s'applique directement sur la page de paiement Stripe. Sans engagement, vous pouvez annuler avant le deuxième mois."
   },
 ]
 
 export default function FAQ() {
-  const [open, setOpen] = useState<number | null>(0)
+  const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <section id="faq" className="relative py-28 px-6 overflow-hidden">
-      <div className="glow-orb w-[400px] h-[400px] bg-indigo-600/10 bottom-0 right-[-100px]" />
-
+    <section id="faq" className="relative py-28 px-6">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-14">
-          <div className="section-label">
-            <span className="w-4 h-px bg-blue-400" />
-            Questions fréquentes
-            <span className="w-4 h-px bg-blue-400" />
-          </div>
-          <h2 className="font-display text-4xl font-bold text-white">
-            Tout ce que vous voulez savoir
-          </h2>
+        <div className="mb-14">
+          <p className="text-blue-400 text-sm font-semibold mb-3 tracking-wide uppercase">FAQ</p>
+          <h2 className="font-display text-4xl font-bold text-white">Questions fréquentes</h2>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {faqs.map((f, i) => (
             <div key={i}
-              className={`card-glass overflow-hidden transition-all duration-300 cursor-pointer ${
-                open === i ? 'border-blue-500/30' : 'hover:border-white/10'
+              className={`border rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${
+                open === i ? 'border-white/15 bg-white/3' : 'border-white/6 hover:border-white/12'
               }`}
               onClick={() => setOpen(open === i ? null : i)}>
               <div className="flex items-center justify-between p-5 gap-4">
-                <span className={`font-medium text-sm ${open === i ? 'text-white' : 'text-white/70'}`}>
+                <span className={`text-sm font-medium leading-relaxed ${open === i ? 'text-white' : 'text-white/60'}`}>
                   {f.q}
                 </span>
-                <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center border transition-all ${
-                  open === i ? 'bg-blue-500 border-blue-500' : 'border-white/10'
-                }`}>
-                  {open === i
-                    ? <Minus size={12} className="text-white" />
-                    : <Plus size={12} className="text-white/40" />
-                  }
+                <div className="shrink-0 text-white/30">
+                  {open === i ? <Minus size={14} /> : <Plus size={14} />}
                 </div>
               </div>
               {open === i && (
-                <div className="px-5 pb-5 text-white/50 text-sm leading-relaxed border-t border-white/5 pt-4">
+                <div className="px-5 pb-5 text-white/45 text-sm leading-relaxed border-t border-white/6 pt-4">
                   {f.a}
                 </div>
               )}
