@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { Check, Zap, Star, ArrowRight, Shield, Clock, TrendingUp } from 'lucide-react'
-import { loadStripe } from '@stripe/stripe-js'
 
 const features = [
   'Dashboard CA temps réel',
@@ -24,17 +23,21 @@ const comparaisons = [
 
 const stack = ['n8n', 'Google Sheets', 'Gmail', 'Stripe', 'GPT-4o', 'Supabase', 'Vercel']
 
+// ⚠️ Remplace par tes vrais Price IDs Stripe
+const PRICE_MONTHLY = 'price_1T1QK42fhxDJntt9VCBc77Gs'
+const PRICE_ANNUAL  = 'price_1TABiy2fhxDJntt99715Z9e4'
+
 export default function Pricing() {
   const [loading, setLoading] = useState(false)
   const [annual, setAnnual]   = useState(false)
+  const [error, setError]     = useState('')
 
-  const price    = annual ? 39 : 49
-  const priceId  = annual
-    ? process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_ID
-    : process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_ID
+  const price   = annual ? 39 : 49
+  const priceId = annual ? PRICE_ANNUAL : PRICE_MONTHLY
 
   const handleCheckout = async () => {
     setLoading(true)
+    setError('')
     try {
       const res  = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -42,8 +45,14 @@ export default function Pricing() {
         body: JSON.stringify({ priceId, annual }),
       })
       const data = await res.json()
+      if (data.error) {
+        setError(data.error)
+        setLoading(false)
+        return
+      }
       if (data.url) window.location.href = data.url
-    } catch {
+    } catch (e: any) {
+      setError('Erreur de connexion — réessayez')
       setLoading(false)
     }
   }
@@ -94,7 +103,6 @@ export default function Pricing() {
           <div className="md:col-span-2 relative card-glass p-8 border-blue-500/40"
             style={{ boxShadow: '0 0 80px rgba(59,130,246,0.12)' }}>
 
-            {/* Badge lancement */}
             <div className="absolute -top-3.5 left-8">
               <span className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-500/40">
                 <Star size={11} fill="white" /> OFFRE LANCEMENT — 1er mois à 19€
@@ -102,7 +110,6 @@ export default function Pricing() {
             </div>
 
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 pt-4 mb-8">
-              {/* Prix */}
               <div>
                 <div className="flex items-end gap-3 mb-1">
                   <span className="font-display text-6xl font-extrabold text-white">{price}€</span>
@@ -120,7 +127,6 @@ export default function Pricing() {
                 </div>
               </div>
 
-              {/* Features */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 flex-1">
                 {features.map((f) => (
                   <li key={f} className="flex items-center gap-2.5 text-sm text-white/70 list-none">
@@ -130,6 +136,13 @@ export default function Pricing() {
                 ))}
               </div>
             </div>
+
+            {/* Erreur */}
+            {error && (
+              <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
 
             {/* CTA Stripe */}
             <div className="space-y-3">
@@ -164,8 +177,6 @@ export default function Pricing() {
 
           {/* Colonne droite */}
           <div className="flex flex-col gap-4">
-
-            {/* Comparaison */}
             <div className="card-glass p-6">
               <h3 className="font-display font-semibold text-white text-sm mb-4">Ce que vous économisez</h3>
               <div className="space-y-2">
@@ -188,7 +199,6 @@ export default function Pricing() {
               </div>
             </div>
 
-            {/* Stack */}
             <div className="card-glass p-6">
               <h3 className="font-display font-semibold text-white text-sm mb-3">Stack incluse</h3>
               <div className="flex flex-wrap gap-2">
@@ -198,7 +208,6 @@ export default function Pricing() {
               </div>
             </div>
 
-            {/* ROI */}
             <div className="card-glass p-6 border-green-500/20 bg-green-500/5">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
