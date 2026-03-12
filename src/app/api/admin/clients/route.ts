@@ -18,31 +18,31 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Pour chaque client, on récupère ses stats
   const clientsAvecStats = await Promise.all((users || []).map(async (user) => {
     const [leads, factures, workflows, ca] = await Promise.all([
       supabaseAdmin.from('leads').select('id', { count: 'exact' }).eq('user_id', user.id),
       supabaseAdmin.from('factures').select('montant_ttc, statut').eq('user_id', user.id),
-      supabaseAdmin.from('workflows').select('id, actif, statut').eq('user_id', user.id),
+      supabaseAdmin.from('workflows').select('id, nom, actif, statut, nb_executions_mois, derniere_execution, erreur_message').eq('user_id', user.id),
       supabaseAdmin.from('ca_data').select('ca_ht').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1),
     ])
 
-    const impayees   = (factures.data || []).filter(f => f.statut !== 'payée').length
-    const wfActifs   = (workflows.data || []).filter(w => w.actif).length
-    const caDernier  = ca.data?.[0]?.ca_ht || 0
+    const impayees  = (factures.data || []).filter(f => f.statut !== 'payée').length
+    const wfActifs  = (workflows.data || []).filter(w => w.actif).length
+    const caDernier = ca.data?.[0]?.ca_ht || 0
 
     return {
-      id:          user.id,
-      nom:         user.nom || '',
-      email:       user.email || '',
-      secteur:     user.secteur || '—',
-      statut:      user.statut || 'actif',
-      created_at:  user.created_at,
+      id:                 user.id,
+      nom:                user.nom || '',
+      email:              user.email || '',
+      secteur:            user.secteur || '—',
+      statut:             user.statut || 'actif',
+      created_at:         user.created_at,
       stripe_customer_id: user.stripe_customer_id,
-      leads:       leads.count || 0,
-      factures_impayees: impayees,
-      workflows_actifs:  wfActifs,
-      ca_dernier:  caDernier,
+      leads:              leads.count || 0,
+      factures_impayees:  impayees,
+      workflows_actifs:   wfActifs,
+      ca_dernier:         caDernier,
+      workflows:          workflows.data || [],
     }
   }))
 
