@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { FileText, AlertCircle, CheckCircle, Clock, Plus, Pencil, Trash2, X, Check, RefreshCw, Download } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
-import ImportCSV from '@/components/ImportCSV'
+
 
 interface Facture {
   id: string
@@ -96,10 +96,7 @@ export default function FacturesPage() {
         </div>
       </div>
 
-      {/* Import CSV */}
-      <div className="mb-8">
-        <ImportCSV onSuccess={refresh} />
-      </div>
+    
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
