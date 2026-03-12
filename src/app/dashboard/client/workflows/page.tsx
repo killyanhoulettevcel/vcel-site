@@ -1,6 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Zap, XCircle, RefreshCw, BarChart2, Mail } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface Workflow {
   id: string
@@ -20,27 +26,54 @@ const statutConfig: Record<string, { label: string, color: string, dot: string }
 }
 
 const workflowIcons: Record<string, React.ElementType> = {
-  'CA Sheets → Supabase': BarChart2,
-  'Résumé hebdo IA': Mail,
-  'Résumé hebdomadaire IA': Mail,
+  'CA Sheets → Supabase':    BarChart2,
+  'Résumé hebdo IA':         Mail,
+  'Résumé hebdomadaire IA':  Mail,
 }
 
 export default function WorkflowsPage() {
   const [workflows, setWorkflows]   = useState<Workflow[]>([])
   const [loading, setLoading]       = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchWorkflows = async () => {
     try {
       const res  = await fetch('/api/workflows')
       const data = await res.json()
       setWorkflows(Array.isArray(data) ? data : [])
+      setLastUpdate(new Date())
     } catch {}
     setLoading(false)
     setRefreshing(false)
   }
 
-  useEffect(() => { fetchWorkflows() }, [])
+  useEffect(() => {
+    fetchWorkflows()
+
+    // Real time Supabase — écoute les changements sur la table workflows
+    const channel = supabase
+      .channel('workflows-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'workflows' },
+        (payload) => {
+          // Mettre à jour le workflow modifié sans refetch complet
+          if (payload.eventType === 'UPDATE') {
+            setWorkflows(prev => prev.map(w =>
+              w.id === (payload.new as any).id ? { ...w, ...(payload.new as any) } : w
+            ))
+            setLastUpdate(new Date())
+          } else {
+            // INSERT ou DELETE → refetch complet
+            fetchWorkflows()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   const refresh = () => { setRefreshing(true); fetchWorkflows() }
 
@@ -53,7 +86,15 @@ export default function WorkflowsPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-white mb-1">Workflows</h1>
-          <p className="text-white/40 text-sm">Vos automatisations n8n actives</p>
+          <div className="flex items-center gap-3">
+            <p className="text-white/40 text-sm">Vos automatisations n8n actives</p>
+            {lastUpdate && (
+              <span className="flex items-center gap-1.5 text-xs text-green-400/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                Temps réel
+              </span>
+            )}
+          </div>
         </div>
         <button onClick={refresh}
           className="btn-ghost text-sm py-2 px-4 flex items-center gap-2">
