@@ -1,32 +1,33 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Zap, CheckCircle, XCircle, Circle, RefreshCw, BarChart2, Mail } from 'lucide-react'
+import { Zap, XCircle, RefreshCw, BarChart2, Mail } from 'lucide-react'
 
 interface Workflow {
   id: string
   workflow_id: string
   nom: string
   actif: boolean
-  statut: 'actif' | 'erreur' | 'inactif'
+  statut: 'ok' | 'erreur' | 'inactif'
   nb_executions_mois: number
   derniere_execution?: string
   erreur_message?: string
 }
 
 const statutConfig: Record<string, { label: string, color: string, dot: string }> = {
-  actif:   { label: 'Actif',   color: 'bg-green-500/10 text-green-400 border-green-500/20', dot: 'bg-green-400' },
+  ok:      { label: 'Actif',   color: 'bg-green-500/10 text-green-400 border-green-500/20', dot: 'bg-green-400' },
   erreur:  { label: 'Erreur',  color: 'bg-red-500/10 text-red-400 border-red-500/20',       dot: 'bg-red-400'   },
   inactif: { label: 'Inactif', color: 'bg-white/5 text-white/30 border-white/10',           dot: 'bg-white/20'  },
 }
 
 const workflowIcons: Record<string, React.ElementType> = {
   'CA Sheets → Supabase': BarChart2,
+  'Résumé hebdo IA': Mail,
   'Résumé hebdomadaire IA': Mail,
 }
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([])
-  const [loading, setLoading]     = useState(true)
+  const [workflows, setWorkflows]   = useState<Workflow[]>([])
+  const [loading, setLoading]       = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchWorkflows = async () => {
@@ -43,7 +44,7 @@ export default function WorkflowsPage() {
 
   const refresh = () => { setRefreshing(true); fetchWorkflows() }
 
-  const actifs  = workflows.filter(w => w.actif).length
+  const actifs  = workflows.filter(w => w.statut === 'ok').length
   const erreurs = workflows.filter(w => w.statut === 'erreur').length
   const totalEx = workflows.reduce((s, w) => s + (w.nb_executions_mois || 0), 0)
 
@@ -103,16 +104,17 @@ export default function WorkflowsPage() {
       ) : (
         <div className="space-y-3">
           {workflows.map((w) => {
-            const s   = statutConfig[w.statut] || statutConfig['inactif']
+            const s    = statutConfig[w.statut] || statutConfig['inactif']
             const Icon = workflowIcons[w.nom] || Zap
+            const isOk = w.statut === 'ok'
             return (
               <div key={w.id} className={`card-glass p-5 transition-all ${w.statut === 'erreur' ? 'border-red-500/20' : ''}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      w.actif ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-white/5 border border-white/10'
+                      isOk ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-white/5 border border-white/10'
                     }`}>
-                      <Icon size={18} className={w.actif ? 'text-blue-400' : 'text-white/20'} />
+                      <Icon size={18} className={isOk ? 'text-blue-400' : 'text-white/20'} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -135,8 +137,6 @@ export default function WorkflowsPage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Statut indicator */}
                   <div className={`w-2 h-2 rounded-full shrink-0 mt-2 ${s.dot} ${w.statut === 'erreur' ? 'animate-pulse' : ''}`} />
                 </div>
               </div>
@@ -145,7 +145,6 @@ export default function WorkflowsPage() {
         </div>
       )}
 
-      {/* Info */}
       <div className="card-glass p-5 mt-6 flex items-start gap-3">
         <Zap size={15} className="text-blue-400 shrink-0 mt-0.5" />
         <div>
