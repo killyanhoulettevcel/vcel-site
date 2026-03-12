@@ -1,4 +1,5 @@
 'use client'
+import ImportCSV from '@/components/ImportCSV'
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Check, RefreshCw, Download } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
@@ -83,6 +84,11 @@ export default function FinancesPage() {
           <button onClick={refresh} className="btn-ghost text-sm py-2.5 px-4"><RefreshCw size={14} /></button>
           <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Ajouter un mois</button>
         </div>
+      </div>
+
+      {/* Import CSV */}
+      <div className="mb-8">
+        <ImportCSV onSuccess={refresh} />
       </div>
 
       {/* KPIs */}
