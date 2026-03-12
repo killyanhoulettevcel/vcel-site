@@ -1,5 +1,4 @@
 'use client'
-import ImportCSV from '@/components/ImportCSV'
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Check, RefreshCw, Download } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
@@ -86,10 +85,7 @@ export default function FinancesPage() {
         </div>
       </div>
 
-      {/* Import CSV */}
-      <div className="mb-8">
-        <ImportCSV onSuccess={refresh} />
-      </div>
+    
 
       {/* KPIs */}
       {caData.length === 0 && !loading ? (
