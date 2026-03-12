@@ -13,62 +13,59 @@ export default function Navbar() {
   }, [])
 
   const links = [
-    { label: 'Workflows', href: '#workflows' },
+    { label: 'Fonctionnalités', href: '#workflows' },
     { label: 'Tarifs', href: '#tarifs' },
     { label: 'FAQ', href: '#faq' },
-    { label: 'Espace client', href: '/login' },
   ]
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-      scrolled ? 'py-3' : 'py-5'
-    }`}>
-      <div className={`mx-auto max-w-6xl px-6 flex items-center justify-between rounded-2xl transition-all duration-500 ${
-        scrolled ? 'bg-navy-900/80 backdrop-blur-xl border border-white/5 shadow-2xl' : ''
-      }`} style={scrolled ? { padding: '12px 24px' } : {}}>
-
-        {/* Logo */}
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'py-2' : 'py-4'}`}>
+      <div className={`mx-auto max-w-6xl px-6 flex items-center justify-between transition-all duration-300 rounded-2xl ${
+        scrolled ? 'bg-[#080c14]/90 backdrop-blur-xl border border-white/5 shadow-xl shadow-black/40 py-3 px-6' : ''
+      }`}>
         <a href="#" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/40 group-hover:shadow-blue-500/60 transition-all">
-            <Zap size={16} className="text-white" fill="white" />
+          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+            <Zap size={15} className="text-white" fill="white" />
           </div>
-          <span className="font-display font-800 text-lg text-white tracking-tight">VCEL</span>
+          <span className="font-display font-bold text-base text-white tracking-tight">VCEL</span>
         </a>
 
-        {/* Desktop links */}
         <div className="hidden md:flex items-center gap-8">
           {links.map(l => (
             <a key={l.href} href={l.href}
-              className="text-sm text-white/60 hover:text-white transition-colors font-medium">
+              className="text-sm text-white/50 hover:text-white/90 transition-colors font-medium">
               {l.label}
             </a>
           ))}
         </div>
 
-        {/* CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <a href="/login" className="btn-ghost text-sm py-2.5 px-5">Espace client</a>
-          <a href="#contact" className="btn-primary text-sm py-2.5 px-5">
-            Démarrer <span className="text-blue-200 text-xs font-normal">→</span>
+          <a href="/login" className="text-sm text-white/50 hover:text-white transition-colors font-medium px-4 py-2">
+            Connexion
+          </a>
+          <a href="#tarifs"
+            className="text-sm bg-white text-[#080c14] font-semibold px-4 py-2 rounded-lg hover:bg-white/90 transition-all">
+            Démarrer →
           </a>
         </div>
 
-        {/* Mobile */}
         <button onClick={() => setOpen(!open)} className="md:hidden text-white/60 hover:text-white">
-          {open ? <X size={22} /> : <Menu size={22} />}
+          {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
-      {/* Mobile menu */}
       {open && (
-        <div className="md:hidden mx-6 mt-2 card-glass p-6 flex flex-col gap-4">
+        <div className="md:hidden mx-4 mt-2 bg-[#0d1321] border border-white/10 rounded-2xl p-6 flex flex-col gap-5">
           {links.map(l => (
             <a key={l.href} href={l.href} onClick={() => setOpen(false)}
               className="text-white/70 hover:text-white text-sm font-medium">
               {l.label}
             </a>
           ))}
-          <a href="#contact" className="btn-primary text-sm justify-center">Démarrer maintenant</a>
+          <div className="pt-2 border-t border-white/5 flex flex-col gap-3">
+            <a href="/login" className="text-white/50 text-sm text-center">Connexion</a>
+            <a href="#tarifs" className="bg-white text-[#080c14] font-semibold text-sm text-center py-3 rounded-xl">Démarrer</a>
+          </div>
         </div>
       )}
     </nav>
