@@ -1,14 +1,10 @@
 // src/app/api/import-csv/route.ts
-// Import CSV universel → Supabase + Google Sheets
-// Détecte automatiquement le type selon les colonnes
-
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { sheetsAppend, getUserSheetId } from '@/lib/googleSheets'
 
-// ── Détection automatique du type de CSV ──────────────────────────────────────
 function detectType(headers: string[]): 'ca' | 'leads' | 'factures' | 'factures_fournisseurs' | 'unknown' {
   const h = headers.map(x => x.toLowerCase().trim())
   if (h.includes('ca_ht') || h.includes('marge_brute') || h.includes('charges_total'))
@@ -22,7 +18,6 @@ function detectType(headers: string[]): 'ca' | 'leads' | 'factures' | 'factures_
   return 'unknown'
 }
 
-// ── Parseur CSV simple ────────────────────────────────────────────────────────
 function parseCSV(text: string): { headers: string[], rows: Record<string, string>[] } {
   const lines = text.trim().split('\n').filter(Boolean)
   if (lines.length < 2) return { headers: [], rows: [] }
@@ -34,7 +29,6 @@ function parseCSV(text: string): { headers: string[], rows: Record<string, strin
   return { headers, rows }
 }
 
-// ── Transformateurs par type ──────────────────────────────────────────────────
 function transformCA(row: Record<string, string>, userId: string) {
   const ca_ht   = parseFloat(row.ca_ht)    || 0
   const charges = parseFloat(row.charges_total) || parseFloat(row.charges) || 0
@@ -58,7 +52,7 @@ function transformLead(row: Record<string, string>, userId: string) {
     entreprise: row.entreprise || '',
     secteur:    row.secteur || '',
     message:    row.message || '',
-    score:      parseInt(row.score) || 0,
+    score:      row.score || 'froid',
     statut:     row.statut || 'nouveau',
     source:     row.source || '',
   }
@@ -80,26 +74,25 @@ function transformFacture(row: Record<string, string>, userId: string) {
 }
 
 function transformFournisseur(row: Record<string, string>, userId: string) {
-  const montant_ht  = parseFloat(row.montant_ht)  || 0
-  const tva         = parseFloat(row.tva)          || 0
+  const montant_ht = parseFloat(row.montant_ht) || 0
+  const tva        = parseFloat(row.tva)         || 0
   return {
-    user_id:         userId,
-    date_reception:  row.date_reception || new Date().toISOString().split('T')[0],
-    fournisseur:     row.fournisseur || '',
-    numero_facture:  row.numero_facture || '',
+    user_id:        userId,
+    date_reception: row.date_reception || new Date().toISOString().split('T')[0],
+    fournisseur:    row.fournisseur || '',
+    numero_facture: row.numero_facture || '',
     montant_ht,
     tva,
-    montant_ttc:     parseFloat(row.montant_ttc) || montant_ht + tva,
-    date_facture:    row.date_facture || '',
-    statut:          row.statut || 'reçue',
+    montant_ttc:    parseFloat(row.montant_ttc) || montant_ht + tva,
+    date_facture:   row.date_facture || '',
+    statut:         row.statut || 'reçue',
   }
 }
 
-// ── Ligne Google Sheets par type ──────────────────────────────────────────────
 function toSheetRow(type: string, data: any): any[] {
   switch (type) {
     case 'ca':
-      return [data.mois, data.ca_ht, data.charges, data.marge, 0, Math.round(data.ca_ht * 0.2), 0, Math.round(data.ca_ht * 0.2), data.ca_ht, data.nb_factures, 0, 0]
+      return [data.mois, data.ca_ht, data.charges, data.marge, Math.round(data.ca_ht > 0 ? data.charges/data.ca_ht*100 : 0), Math.round(data.ca_ht * 0.2), 0, Math.round(data.ca_ht * 0.2), data.ca_ht, data.nb_factures, 0, 0]
     case 'leads':
       return [data.date, data.nom, data.email, data.telephone, data.entreprise, data.secteur, data.message, data.score, data.statut, data.source]
     case 'factures':
@@ -118,11 +111,12 @@ const TAB_MAP: Record<string, string> = {
   factures_fournisseurs:'factures_fournisseurs!A:H',
 }
 
-const TABLE_MAP: Record<string, string> = {
-  ca:                   'ca_data',
-  leads:                'leads',
-  factures:             'factures',
-  factures_fournisseurs:'factures_fournisseurs',
+// Contraintes upsert réelles dans Supabase
+const UPSERT_MAP: Record<string, { table: string, conflict: string }> = {
+  ca:                   { table: 'ca_data',               conflict: 'user_id,mois' },
+  leads:                { table: 'leads',                  conflict: 'id' },
+  factures:             { table: 'factures',               conflict: 'id' },
+  factures_fournisseurs:{ table: 'factures_fournisseurs',  conflict: 'id' },
 }
 
 export async function POST(req: NextRequest) {
@@ -136,6 +130,7 @@ export async function POST(req: NextRequest) {
 
   const text = await file.text()
   const { headers, rows } = parseCSV(text)
+
   if (!headers.length || !rows.length)
     return NextResponse.json({ error: 'CSV vide ou invalide' }, { status: 400 })
 
@@ -143,33 +138,67 @@ export async function POST(req: NextRequest) {
   if (type === 'unknown')
     return NextResponse.json({ error: 'Type de CSV non reconnu. Colonnes détectées: ' + headers.join(', ') }, { status: 400 })
 
-  // Transformer les lignes
   const transformers: Record<string, Function> = {
     ca:                   transformCA,
     leads:                transformLead,
     factures:             transformFacture,
     factures_fournisseurs:transformFournisseur,
   }
-  const transformed = rows.filter(r => Object.values(r).some(v => v)).map(r => transformers[type](r, userId))
 
-  // Insérer dans Supabase (par batch de 50)
-  const table = TABLE_MAP[type]
+  const transformed = rows
+    .filter(r => Object.values(r).some(v => v))
+    .map(r => transformers[type](r, userId))
+
+  // Pour CA : upsert avec contrainte connue
+  // Pour les autres : insert simple (pas de doublon attendu)
+  const { table, conflict } = UPSERT_MAP[type]
   let inserted = 0
+  let lastError = ''
+
   for (let i = 0; i < transformed.length; i += 50) {
     const batch = transformed.slice(i, i + 50)
-    const { error } = await supabaseAdmin.from(table).upsert(batch, { onConflict: 'user_id,mois' })
-    if (!error) inserted += batch.length
+    let error: any
+
+    if (type === 'ca') {
+      // CA a une contrainte unique user_id+mois
+      const res = await supabaseAdmin.from(table).upsert(batch, { onConflict: 'user_id,mois', ignoreDuplicates: false })
+      error = res.error
+    } else {
+      // Les autres : insert normal
+      const res = await supabaseAdmin.from(table).insert(batch)
+      error = res.error
+    }
+
+    if (error) {
+      lastError = error.message
+      console.error('[Import CSV] Erreur Supabase:', error)
+    } else {
+      inserted += batch.length
+    }
   }
 
   // Sync Google Sheets
+  let sheetsSynced = false
   try {
     const sheetId = await getUserSheetId(supabaseAdmin, userId)
     if (sheetId) {
       const sheetRows = transformed.map(d => toSheetRow(type, d))
       await sheetsAppend(sheetId, TAB_MAP[type], sheetRows)
+      sheetsSynced = true
     }
-  } catch (e) {
-    console.error('[Import CSV] Erreur sync Sheets:', e)
+  } catch (e: any) {
+    console.error('[Import CSV] Erreur sync Sheets:', e.message)
+  }
+
+  if (inserted === 0) {
+    return NextResponse.json({
+      success: false,
+      type,
+      inserted: 0,
+      total: rows.length,
+      message: lastError || 'Aucune ligne insérée',
+      error: lastError,
+    }, { status: 400 })
   }
 
   return NextResponse.json({
@@ -177,6 +206,7 @@ export async function POST(req: NextRequest) {
     type,
     inserted,
     total: rows.length,
-    message: `${inserted} lignes importées dans "${table}" et Google Sheets`,
+    sheetsSynced,
+    message: `${inserted} lignes importées dans "${table}"${sheetsSynced ? ' et Google Sheets' : ''}`,
   })
 }
