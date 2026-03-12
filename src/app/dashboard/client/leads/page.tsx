@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check, Search, RefreshCw, Download } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
+import ImportCSV from '@/components/ImportCSV'
 
 interface Lead {
   id: string
@@ -68,15 +69,18 @@ export default function LeadsPage() {
     }
     setSaving(false)
     setShowModal(false)
+    refresh()
   }
 
   const changeStatut = async (id: string, statut: string) => {
     await fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
+    refresh()
   }
 
   const deleteLead = async (id: string) => {
     if (!confirm('Supprimer ce lead ?')) return
     await fetch(`/api/leads?id=${id}`, { method: 'DELETE' })
+    refresh()
   }
 
   const chauds    = leads.filter(l => l.score === 'chaud').length
@@ -102,6 +106,11 @@ export default function LeadsPage() {
           <button onClick={() => exportCSV(leads, 'leads')} className="btn-ghost text-sm py-2.5 px-4" title="Exporter CSV"><Download size={14} /></button>
           <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Nouveau lead</button>
         </div>
+      </div>
+
+      {/* Import CSV */}
+      <div className="mb-8">
+        <ImportCSV onSuccess={refresh} />
       </div>
 
       {/* Stats */}
