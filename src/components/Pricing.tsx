@@ -163,7 +163,7 @@ export default function Pricing() {
                   min={10} max={200} step={5}
                   value={tauxHoraire}
                   onChange={e => setTauxHoraire(Number(e.target.value))}
-                  className="w-full accent-blue-500 cursor-pointer"
+                  style={{ width: '100%', cursor: 'pointer', accentColor: '#3b82f6' }}
                 />
                 <div className="flex justify-between text-white/20 text-xs mt-1">
                   <span>10€</span>
