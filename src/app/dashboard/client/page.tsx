@@ -245,7 +245,7 @@ export default function ClientDashboard() {
                   <span className="text-white/70 text-sm">{w.nom}</span>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-white/30">
-                  <span>{w.executions || 0} exec.</span>
+                 <span>{w.nb_executions_mois || 0} exec.</span>
                   <span className={`px-2 py-0.5 rounded-full font-medium ${
                     w.statut === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                   }`}>
