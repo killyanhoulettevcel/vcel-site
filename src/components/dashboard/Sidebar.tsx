@@ -3,7 +3,7 @@ import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   Zap, LayoutDashboard, FileText, Users,
-  Activity, Settings, LogOut, Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target
+  Activity, Settings, LogOut, Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload
 } from 'lucide-react'
 
 interface NavItem {
@@ -14,17 +14,18 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Vue globale',    href: '/dashboard/admin',           icon: Shield,          adminOnly: true },
-  { label: 'Mon dashboard',  href: '/dashboard/client',          icon: LayoutDashboard },
-  { label: 'Démarrage',       href: '/dashboard/client/onboarding', icon: Rocket },
-  { label: 'CA & Finances',  href: '/dashboard/client/finances', icon: Activity },
-  { label: 'Factures',       href: '/dashboard/client/factures', icon: FileText },
-  { label: 'Leads CRM',      href: '/dashboard/client/leads',    icon: Users },
-  { label: 'Workflows',      href: '/dashboard/client/workflows',icon: Zap },
-  { label: 'Coach IA',        href: '/dashboard/client/coach',     icon: Brain },
-  { label: 'Suggestions prix', href: '/dashboard/client/prix',      icon: Euro },
+  { label: 'Vue globale',      href: '/dashboard/admin',              icon: Shield,         adminOnly: true },
+  { label: 'Mon dashboard',    href: '/dashboard/client',             icon: LayoutDashboard },
+  { label: 'Démarrage',        href: '/dashboard/client/onboarding',  icon: Rocket },
+  { label: 'CA & Finances',    href: '/dashboard/client/finances',    icon: Activity },
+  { label: 'Factures',         href: '/dashboard/client/factures',    icon: FileText },
+  { label: 'Leads CRM',        href: '/dashboard/client/leads',       icon: Users },
+  { label: 'Workflows',        href: '/dashboard/client/workflows',   icon: Zap },
+  { label: 'Coach IA',         href: '/dashboard/client/coach',       icon: Brain },
+  { label: 'Suggestions prix', href: '/dashboard/client/prix',        icon: Euro },
   { label: 'Rentabilité',      href: '/dashboard/client/rentabilite', icon: Calculator },
   { label: 'Objectifs',        href: '/dashboard/client/objectifs',   icon: Target },
+  { label: 'Importer CSV',     href: '/dashboard/client/import',      icon: Upload },
 ]
 
 export default function Sidebar() {
@@ -61,7 +62,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {items.map((item) => {
           const active = pathname === item.href
           return (
