@@ -1,7 +1,17 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Users, TrendingUp, Zap, Euro, Crown, RefreshCw, ExternalLink } from 'lucide-react'
+import { Users, TrendingUp, Zap, Euro, Crown, RefreshCw, AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+
+interface Workflow {
+  id: string
+  nom: string
+  actif: boolean
+  statut: 'actif' | 'erreur' | 'inactif'
+  nb_executions_mois: number
+  derniere_execution?: string
+  erreur_message?: string
+}
 
 interface Client {
   id: string
@@ -15,6 +25,7 @@ interface Client {
   factures_impayees: number
   workflows_actifs: number
   ca_dernier: number
+  workflows?: Workflow[]
 }
 
 const colorMap: Record<string, string> = {
@@ -24,10 +35,67 @@ const colorMap: Record<string, string> = {
   orange: 'bg-orange-500/10 text-orange-400',
 }
 
+function WorkflowDots({ workflows }: { workflows?: Workflow[] }) {
+  if (!workflows || workflows.length === 0) {
+    return <span className="text-white/20 text-xs">—</span>
+  }
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {workflows.map(w => (
+        <div key={w.id} title={`${w.nom}${w.erreur_message ? ' — ' + w.erreur_message : ''}`}
+          className={`w-2 h-2 rounded-full ${
+            w.statut === 'actif'   ? 'bg-green-400' :
+            w.statut === 'erreur'  ? 'bg-red-400 animate-pulse' :
+            'bg-white/15'
+          }`} />
+      ))}
+      {workflows.filter(w => w.statut === 'erreur').length > 0 && (
+        <AlertTriangle size={11} className="text-red-400 ml-1" />
+      )}
+    </div>
+  )
+}
+
+function WorkflowDetail({ workflows }: { workflows?: Workflow[] }) {
+  if (!workflows || workflows.length === 0) {
+    return <p className="text-white/20 text-xs py-2">Aucun workflow configuré</p>
+  }
+  return (
+    <div className="grid grid-cols-2 gap-2 mt-3">
+      {workflows.map(w => (
+        <div key={w.id} className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${
+          w.statut === 'erreur'  ? 'bg-red-500/8 border-red-500/20' :
+          w.statut === 'actif'   ? 'bg-green-500/5 border-green-500/15' :
+          'bg-white/3 border-white/8'
+        }`}>
+          <div className={`w-1.5 h-1.5 rounded-full mt-0.5 shrink-0 ${
+            w.statut === 'actif'  ? 'bg-green-400' :
+            w.statut === 'erreur' ? 'bg-red-400 animate-pulse' :
+            'bg-white/20'
+          }`} />
+          <div className="min-w-0">
+            <p className="text-white/70 font-medium truncate">{w.nom}</p>
+            {w.erreur_message && (
+              <p className="text-red-400 mt-0.5 truncate">{w.erreur_message}</p>
+            )}
+            {w.derniere_execution && (
+              <p className="text-white/25 mt-0.5">
+                {new Date(w.derniere_execution).toLocaleDateString('fr-FR')}
+              </p>
+            )}
+            <p className="text-white/20">{w.nb_executions_mois || 0} exec/mois</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
-  const [clients, setClients]   = useState<Client[]>([])
-  const [loading, setLoading]   = useState(true)
+  const [clients, setClients]       = useState<Client[]>([])
+  const [loading, setLoading]       = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [expanded, setExpanded]     = useState<string | null>(null)
 
   const fetchClients = async () => {
     setLoading(true)
@@ -50,13 +118,13 @@ export default function AdminDashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // ── KPIs calculés ──────────────────────────────────────────────────────────
-  const actifs     = clients.filter(c => c.statut === 'actif').length
-  const mrr        = actifs * 49
-  const totalLeads = clients.reduce((s, c) => s + (c.leads || 0), 0)
-  const totalWf    = clients.reduce((s, c) => s + (c.workflows_actifs || 0), 0)
+  const actifs      = clients.filter(c => c.statut === 'actif').length
+  const mrr         = actifs * 49
+  const totalLeads  = clients.reduce((s, c) => s + (c.leads || 0), 0)
+  const totalWf     = clients.reduce((s, c) => s + (c.workflows_actifs || 0), 0)
+  const wfEnErreur  = clients.reduce((s, c) =>
+    s + (c.workflows?.filter(w => w.statut === 'erreur').length || 0), 0)
 
-  // MRR simulé sur 6 mois (basé sur nb clients actifs)
   const mrrData = clients.length > 0 ? [
     { mois: 'Oct', mrr: Math.max(0, actifs - 5) * 49 },
     { mois: 'Nov', mrr: Math.max(0, actifs - 4) * 49 },
@@ -67,10 +135,10 @@ export default function AdminDashboard() {
   ] : []
 
   const kpis = [
-    { label: 'Clients actifs',   value: String(actifs),        sub: `${clients.length} total`,         icon: Users,       color: 'blue' },
-    { label: 'MRR',              value: `${mrr}€`,             sub: `${actifs} × 49€/mois`,            icon: Euro,        color: 'green' },
-    { label: 'Leads générés',    value: String(totalLeads),    sub: 'tous clients confondus',           icon: TrendingUp,  color: 'purple' },
-    { label: 'Workflows actifs', value: `${totalWf}`,          sub: `sur ${clients.length * 8} total`,  icon: Zap,         color: 'orange' },
+    { label: 'Clients actifs',    value: String(actifs),     sub: `${clients.length} total`,          icon: Users,     color: 'blue' },
+    { label: 'MRR',               value: `${mrr}€`,          sub: `${actifs} × 49€/mois`,             icon: Euro,      color: 'green' },
+    { label: 'Leads générés',     value: String(totalLeads), sub: 'tous clients confondus',            icon: TrendingUp, color: 'purple' },
+    { label: 'Workflows actifs',  value: `${totalWf}`,       sub: `${wfEnErreur} en erreur`,           icon: Zap,       color: wfEnErreur > 0 ? 'orange' : 'blue' },
   ]
 
   return (
@@ -97,6 +165,16 @@ export default function AdminDashboard() {
         </button>
       </div>
 
+      {/* Alerte workflows en erreur */}
+      {wfEnErreur > 0 && (
+        <div className="mb-6 flex items-center gap-3 p-4 rounded-xl bg-red-500/8 border border-red-500/20">
+          <AlertTriangle size={16} className="text-red-400 shrink-0" />
+          <p className="text-red-400 text-sm font-medium">
+            {wfEnErreur} workflow{wfEnErreur > 1 ? 's' : ''} en erreur chez vos clients — vérifiez les détails ci-dessous
+          </p>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {kpis.map((k) => (
@@ -108,7 +186,9 @@ export default function AdminDashboard() {
               </div>
             </div>
             <p className="font-display text-2xl font-bold text-white mb-1">{k.value}</p>
-            <p className="text-white/30 text-xs">{k.sub}</p>
+            <p className={`text-xs ${k.label === 'Workflows actifs' && wfEnErreur > 0 ? 'text-orange-400' : 'text-white/30'}`}>
+              {k.sub}
+            </p>
           </div>
         ))}
       </div>
@@ -117,7 +197,7 @@ export default function AdminDashboard() {
       {mrrData.length > 0 && (
         <div className="card-glass p-6 mb-6">
           <div className="mb-6">
-            <h2 className="font-display font-semibold text-white text-sm">MRR (Monthly Recurring Revenue)</h2>
+            <h2 className="font-display font-semibold text-white text-sm">MRR</h2>
             <p className="text-white/30 text-xs">Basé sur {actifs} clients actifs × 49€</p>
           </div>
           <ResponsiveContainer width="100%" height={180}>
@@ -144,6 +224,7 @@ export default function AdminDashboard() {
           <h2 className="font-display font-semibold text-white text-sm">
             Clients ({clients.length})
           </h2>
+          <p className="text-white/25 text-xs">Cliquez sur un client pour voir ses workflows</p>
         </div>
 
         {loading ? (
@@ -154,57 +235,84 @@ export default function AdminDashboard() {
         ) : clients.length === 0 ? (
           <div className="text-center py-12">
             <Users size={32} className="text-white/10 mx-auto mb-3" />
-            <p className="text-white/30 text-sm">Aucun client — ils arrivent après paiement Stripe</p>
+            <p className="text-white/30 text-sm">Aucun client</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/5">
-                  {['Client', 'Secteur', 'CA dernier mois', 'Leads', 'Workflows', 'Statut', 'Depuis'].map(h => (
-                    <th key={h} className="text-left text-xs text-white/30 font-medium pb-3 pr-4">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map((c) => (
-                  <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/2 transition-colors">
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-blue-500/20 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xs font-bold">
-                          {(c.nom || c.email).charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-white text-xs font-medium">{c.nom || '—'}</p>
-                          <p className="text-white/30 text-xs">{c.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-white/50 text-xs">{c.secteur}</td>
-                    <td className="py-3 pr-4 text-white font-semibold text-xs">
+          <div className="space-y-1">
+            {clients.map((c) => {
+              const isOpen       = expanded === c.id
+              const erreurs      = c.workflows?.filter(w => w.statut === 'erreur').length || 0
+              const actifCount   = c.workflows?.filter(w => w.statut === 'actif').length || 0
+
+              return (
+                <div key={c.id} className={`border rounded-xl overflow-hidden transition-all ${
+                  erreurs > 0 ? 'border-red-500/20' : 'border-white/5'
+                }`}>
+                  {/* Ligne principale */}
+                  <div
+                    className="flex items-center gap-4 p-4 hover:bg-white/2 cursor-pointer transition-colors"
+                    onClick={() => setExpanded(isOpen ? null : c.id)}>
+
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xs font-bold shrink-0">
+                      {(c.nom || c.email).charAt(0).toUpperCase()}
+                    </div>
+
+                    {/* Nom / email */}
+                    <div className="min-w-0 w-40 shrink-0">
+                      <p className="text-white text-xs font-medium truncate">{c.nom || '—'}</p>
+                      <p className="text-white/30 text-xs truncate">{c.email}</p>
+                    </div>
+
+                    {/* Secteur */}
+                    <p className="text-white/40 text-xs w-28 shrink-0 hidden md:block">{c.secteur}</p>
+
+                    {/* CA */}
+                    <p className="text-white text-xs font-semibold w-20 shrink-0 hidden lg:block">
                       {c.ca_dernier > 0 ? `${c.ca_dernier.toLocaleString('fr-FR')}€` : '—'}
-                    </td>
-                    <td className="py-3 pr-4 text-white/70 text-xs">{c.leads}</td>
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                        <span className="text-white/50 text-xs">{c.workflows_actifs}/8</span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        c.statut === 'actif' ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'
-                      }`}>
-                        {c.statut}
-                      </span>
-                    </td>
-                    <td className="py-3 text-white/30 text-xs">
-                      {c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </p>
+
+                    {/* Workflows dots */}
+                    <div className="flex-1">
+                      <WorkflowDots workflows={c.workflows} />
+                    </div>
+
+                    {/* Statut workflows résumé */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {erreurs > 0 ? (
+                        <span className="flex items-center gap-1 text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                          <XCircle size={10} /> {erreurs} erreur{erreurs > 1 ? 's' : ''}
+                        </span>
+                      ) : actifCount > 0 ? (
+                        <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
+                          <CheckCircle size={10} /> {actifCount} actifs
+                        </span>
+                      ) : (
+                        <span className="text-xs text-white/20">—</span>
+                      )}
+                    </div>
+
+                    {/* Statut compte */}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                      c.statut === 'actif' ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/30'
+                    }`}>{c.statut}</span>
+
+                    {/* Chevron */}
+                    <div className="text-white/20 shrink-0">
+                      {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </div>
+                  </div>
+
+                  {/* Détail workflows */}
+                  {isOpen && (
+                    <div className="px-4 pb-4 border-t border-white/5 pt-3">
+                      <p className="text-white/30 text-xs mb-2 font-medium uppercase tracking-wide">Détail workflows</p>
+                      <WorkflowDetail workflows={c.workflows} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
