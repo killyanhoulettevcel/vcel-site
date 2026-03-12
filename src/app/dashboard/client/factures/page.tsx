@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { FileText, AlertCircle, CheckCircle, Clock, Plus, Pencil, Trash2, X, Check, RefreshCw, Download } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
+import ImportCSV from '@/components/ImportCSV'
 
 interface Facture {
   id: string
@@ -59,16 +60,18 @@ export default function FacturesPage() {
     }
     setSaving(false)
     setShowModal(false)
-    // Realtime va déclencher le refresh automatiquement
+    refresh()
   }
 
   const deleteFacture = async (id: string) => {
     if (!confirm('Supprimer cette facture ?')) return
     await fetch(`/api/factures?id=${id}`, { method: 'DELETE' })
+    refresh()
   }
 
   const changeStatut = async (id: string, statut: string) => {
     await fetch('/api/factures', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
+    refresh()
   }
 
   return (
@@ -88,13 +91,14 @@ export default function FacturesPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => exportCSV(factures, 'factures')} className="btn-ghost text-sm py-2.5 px-4" title="Exporter CSV"><Download size={14} /></button>
-          <button onClick={refresh} className="btn-ghost text-sm py-2.5 px-4">
-            <RefreshCw size={14} />
-          </button>
-          <button onClick={openCreate} className="btn-primary">
-            <Plus size={16} /> Nouvelle facture
-          </button>
+          <button onClick={refresh} className="btn-ghost text-sm py-2.5 px-4"><RefreshCw size={14} /></button>
+          <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Nouvelle facture</button>
         </div>
+      </div>
+
+      {/* Import CSV */}
+      <div className="mb-8">
+        <ImportCSV onSuccess={refresh} />
       </div>
 
       {/* Stats */}
