@@ -1,7 +1,7 @@
 'use client'
 import { SessionProvider, useSession } from 'next-auth/react'
-import Sidebar from '@/components/Sidebar'
-import Notifications from '@/components/Notifications'
+import Sidebar from '@/components/dashboard/Sidebar'
+import Notifications from '@/components/dashboard/Notifications'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
