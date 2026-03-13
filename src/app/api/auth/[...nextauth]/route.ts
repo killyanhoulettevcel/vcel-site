@@ -86,6 +86,27 @@ export const authOptions: NextAuthOptions = {
         token['uid']  = user.id
         token['role'] = (user as any).role || 'client'
       }
+      // Fallback : si role manquant, le chercher dans Supabase
+      if (!token['role'] && token['uid']) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('role')
+          .eq('id', token['uid'])
+          .single()
+        token['role'] = data?.role || 'client'
+      }
+      // Fallback : si uid manquant (Google), utiliser token.sub
+      if (!token['uid'] && token.sub) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('id, role')
+          .eq('google_id', token.sub)
+          .single()
+        if (data) {
+          token['uid']  = data.id
+          token['role'] = data.role || 'client'
+        }
+      }
       return token
     },
 
