@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import {
   Package, TrendingUp, ShoppingCart, Plus, Pencil, Trash2, X, Check,
-  RefreshCw, Download, Zap, AlertCircle, ExternalLink, BarChart2, ShoppingBag
+  RefreshCw, Download, Zap, AlertCircle, ExternalLink, BarChart2, ShoppingBag, FileText
 } from 'lucide-react'
 import { exportCSV } from '@/lib/exportCSV'
 
@@ -144,6 +144,29 @@ export default function ProduitsPage() {
     if (!confirm('Supprimer cette vente ?')) return
     await fetch(`/api/ventes?id=${id}`, { method: 'DELETE' })
     refreshV()
+  }
+
+  const facturerVente = async (v: Vente) => {
+    // Créer la facture automatiquement
+    const numero = `F-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const montantHt  = v.total || (v.quantite * v.prix_unitaire)
+    const tva        = Math.round(montantHt * 0.2 * 100) / 100
+    const montantTtc = Math.round((montantHt + tva) * 100) / 100
+    const res = await fetch('/api/factures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        numero_facture: numero,
+        date_facture:   v.date_vente || new Date().toISOString().split('T')[0],
+        montant_ht:     montantHt,
+        tva,
+        montant_ttc:    montantTtc,
+        statut:         'en attente',
+      })
+    })
+    if (res.ok) {
+      window.location.href = '/dashboard/client/factures'
+    }
   }
 
   const syncSource = async (source: string, body: any) => {
@@ -339,9 +362,15 @@ export default function ProduitsPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-lg ${sourceColors[v.source] || sourceColors.manuel}`}>{v.source}</span>
                       </td>
                       <td className="py-3">
-                        {v.source === 'manuel' && (
-                          <button onClick={() => deleteVente(v.id)} className="text-white/20 hover:text-red-400 p-1"><Trash2 size={13} /></button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => facturerVente(v)} title="Créer une facture"
+                            className="text-white/20 hover:text-green-400 transition-colors p-1">
+                            <FileText size={13} />
+                          </button>
+                          {v.source === 'manuel' && (
+                            <button onClick={() => deleteVente(v.id)} className="text-white/20 hover:text-red-400 p-1"><Trash2 size={13} /></button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
