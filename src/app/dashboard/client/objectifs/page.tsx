@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Target, Plus, Trash2, TrendingUp, Users, FileText, Percent, RefreshCw, X, Check } from 'lucide-react'
+import { Target, Plus, Trash2, TrendingUp, Users, FileText, Percent, RefreshCw, X, Check, ShoppingBag, BarChart2 } from 'lucide-react'
 
 interface Objectif {
   id: string
@@ -13,33 +13,41 @@ interface Objectif {
 
 interface Reels {
   caMois: number
+  chargesMois: number
+  margeMois: number
   leadsMois: number
   leadsTotal: number
   tauxConversion: number
   montantDu: number
+  nbFacturesMois: number
+  caVentesMois: number
+  nbVentesMois: number
+  margeMoyenne: number
 }
 
 const typesObjectif = [
-  { value: 'ca',         label: 'CA mensuel',          icon: TrendingUp, unit: '€',  placeholder: '2000' },
-  { value: 'leads',      label: 'Leads par mois',       icon: Users,      unit: '',   placeholder: '20' },
-  { value: 'conversion', label: 'Taux de conversion',   icon: Percent,    unit: '%',  placeholder: '15' },
-  { value: 'factures',   label: 'Factures émises',      icon: FileText,   unit: '',   placeholder: '10' },
-  { value: 'custom',     label: 'Objectif personnalisé', icon: Target,    unit: '',   placeholder: '100' },
+  { value: 'ca',         label: 'CA mensuel',          icon: TrendingUp, unit: '€', placeholder: '2000' },
+  { value: 'ventes',     label: 'Ventes (€)',           icon: ShoppingBag,unit: '€', placeholder: '1500' },
+  { value: 'leads',      label: 'Leads par mois',       icon: Users,      unit: '',  placeholder: '20' },
+  { value: 'conversion', label: 'Taux de conversion',   icon: Percent,    unit: '%', placeholder: '15' },
+  { value: 'factures',   label: 'Factures émises',      icon: FileText,   unit: '',  placeholder: '10' },
+  { value: 'marge',      label: 'Marge mensuelle',      icon: BarChart2,  unit: '€', placeholder: '1000' },
+  { value: 'custom',     label: 'Personnalisé',         icon: Target,     unit: '',  placeholder: '100' },
 ]
 
 const emptyForm = { type: 'ca', label: '', cible: '', periode: 'mensuel' }
 
 export default function ObjectifsPage() {
-  const [data, setData]       = useState<{ objectifs: Objectif[], reels: Reels } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState(false)
+  const [data,     setData]     = useState<{ objectifs: Objectif[], reels: Reels } | null>(null)
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm]       = useState(emptyForm)
+  const [form,     setForm]     = useState(emptyForm)
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/objectifs')
+      const res  = await fetch('/api/objectifs')
       const json = await res.json()
       setData(json)
     } catch {}
@@ -55,14 +63,9 @@ export default function ObjectifsPage() {
     await fetch('/api/objectifs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        label: form.label || typeInfo?.label || form.type,
-      })
+      body: JSON.stringify({ ...form, label: form.label || typeInfo?.label || form.type })
     })
-    setForm(emptyForm)
-    setShowForm(false)
-    setSaving(false)
+    setForm(emptyForm); setShowForm(false); setSaving(false)
     fetchData()
   }
 
@@ -71,24 +74,24 @@ export default function ObjectifsPage() {
     fetchData()
   }
 
-  // Calculer la progression selon le type
-  const getProgression = (obj: Objectif, reels: Reels) => {
+  const getProgression = (obj: Objectif, reels: Reels): { actuel: number, unite: string } => {
     switch (obj.type) {
-      case 'ca':         return { actuel: reels.caMois,         unite: '€' }
-      case 'leads':      return { actuel: reels.leadsMois,      unite: '' }
-      case 'conversion': return { actuel: reels.tauxConversion, unite: '%' }
-      case 'factures':   return { actuel: 0,                    unite: '' }
-      default:           return { actuel: 0,                    unite: '' }
+      case 'ca':         return { actuel: reels.caMois,        unite: '€' }
+      case 'ventes':     return { actuel: reels.caVentesMois,  unite: '€' }
+      case 'leads':      return { actuel: reels.leadsMois,     unite: '' }
+      case 'conversion': return { actuel: reels.tauxConversion,unite: '%' }
+      case 'factures':   return { actuel: reels.nbFacturesMois,unite: '' }
+      case 'marge':      return { actuel: reels.margeMois,     unite: '€' }
+      default:           return { actuel: 0,                   unite: '' }
     }
   }
 
-  const getPct = (actuel: number, cible: number) => Math.min(Math.round(actuel / cible * 100), 100)
-
+  const getPct    = (actuel: number, cible: number) => cible > 0 ? Math.min(Math.round(actuel / cible * 100), 100) : 0
   const getStatus = (pct: number) => {
-    if (pct >= 100) return { color: 'text-green-400', bg: 'bg-green-400', label: 'Atteint ✓' }
-    if (pct >= 70)  return { color: 'text-blue-400',  bg: 'bg-blue-400',  label: 'En bonne voie' }
-    if (pct >= 40)  return { color: 'text-orange-400',bg: 'bg-orange-400',label: 'À surveiller' }
-    return             { color: 'text-red-400',   bg: 'bg-red-400',   label: 'En retard' }
+    if (pct >= 100) return { color: 'text-green-400', bg: 'bg-green-400',  label: '✓ Atteint' }
+    if (pct >= 70)  return { color: 'text-blue-400',  bg: 'bg-blue-400',   label: 'En bonne voie' }
+    if (pct >= 40)  return { color: 'text-orange-400',bg: 'bg-orange-400', label: 'À surveiller' }
+    return             { color: 'text-red-400',   bg: 'bg-red-400',    label: 'En retard' }
   }
 
   return (
@@ -108,17 +111,19 @@ export default function ObjectifsPage() {
         </div>
       </div>
 
-      {/* Stats rapides */}
+      {/* Stats réelles */}
       {data?.reels && (
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { label: 'CA ce mois',       value: `${data.reels.caMois.toLocaleString('fr-FR')}€`, icon: TrendingUp, color: 'text-blue-400' },
-            { label: 'Leads ce mois',    value: String(data.reels.leadsMois),                    icon: Users,      color: 'text-purple-400' },
-            { label: 'Taux conversion',  value: `${data.reels.tauxConversion}%`,                 icon: Percent,    color: 'text-green-400' },
-            { label: 'Impayées',         value: `${data.reels.montantDu.toLocaleString('fr-FR')}€`, icon: FileText, color: 'text-orange-400' },
+            { label: 'CA ce mois',      value: `${data.reels.caMois.toLocaleString('fr-FR')}€`,        icon: TrendingUp,  color: 'text-blue-400' },
+            { label: 'Ventes ce mois',  value: `${data.reels.caVentesMois.toLocaleString('fr-FR')}€`,  icon: ShoppingBag, color: 'text-green-400' },
+            { label: 'Marge ce mois',   value: `${data.reels.margeMois.toLocaleString('fr-FR')}€`,     icon: BarChart2,   color: 'text-purple-400' },
+            { label: 'Leads ce mois',   value: String(data.reels.leadsMois),                            icon: Users,       color: 'text-indigo-400' },
+            { label: 'Taux conversion', value: `${data.reels.tauxConversion}%`,                        icon: Percent,     color: 'text-cyan-400' },
+            { label: 'Impayées',        value: `${data.reels.montantDu.toLocaleString('fr-FR')}€`,     icon: FileText,    color: 'text-orange-400' },
           ].map(k => (
             <div key={k.label} className="card-glass p-4 flex items-center gap-3">
-              <k.icon size={16} className={k.color} />
+              <k.icon size={15} className={k.color} />
               <div>
                 <p className="text-white/40 text-xs">{k.label}</p>
                 <p className="text-white font-bold text-sm">{k.value}</p>
@@ -128,14 +133,12 @@ export default function ObjectifsPage() {
         </div>
       )}
 
-      {/* Formulaire ajout */}
+      {/* Formulaire */}
       {showForm && (
-        <div className="card-glass p-5 mb-5 border-blue-500/20">
+        <div className="card-glass p-5 mb-5 border border-blue-500/20">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display font-semibold text-white text-sm">Nouvel objectif</h3>
-            <button onClick={() => setShowForm(false)} className="text-white/30 hover:text-white">
-              <X size={16} />
-            </button>
+            <button onClick={() => setShowForm(false)} className="text-white/30 hover:text-white"><X size={16} /></button>
           </div>
           <div className="space-y-3">
             <div>
@@ -144,9 +147,7 @@ export default function ObjectifsPage() {
                 {typesObjectif.map(t => (
                   <button key={t.value} onClick={() => setForm({...form, type: t.value})}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      form.type === t.value
-                        ? 'bg-blue-500 border-blue-500 text-white'
-                        : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                      form.type === t.value ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
                     }`}>
                     <t.icon size={11} /> {t.label}
                   </button>
@@ -155,7 +156,7 @@ export default function ObjectifsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Label personnalisé</label>
+                <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Label</label>
                 <input value={form.label} onChange={e => setForm({...form, label: e.target.value})}
                   placeholder={typesObjectif.find(t => t.value === form.type)?.label}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
@@ -172,18 +173,15 @@ export default function ObjectifsPage() {
             <div>
               <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Période</label>
               <div className="flex gap-2">
-                {['hebdo', 'mensuel', 'annuel'].map(p => (
+                {['hebdo','mensuel','annuel'].map(p => (
                   <button key={p} onClick={() => setForm({...form, periode: p})}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
-                      form.periode === p
-                        ? 'bg-blue-500 border-blue-500 text-white'
-                        : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                      form.periode === p ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-white/50'
                     }`}>{p}</button>
                 ))}
               </div>
             </div>
-            <button onClick={handleSave} disabled={saving || !form.cible}
-              className="btn-primary disabled:opacity-40">
+            <button onClick={handleSave} disabled={saving || !form.cible} className="btn-primary disabled:opacity-40">
               {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Check size={14} /> Créer l'objectif</>}
             </button>
           </div>
@@ -209,7 +207,6 @@ export default function ObjectifsPage() {
             const prog     = getProgression(obj, data.reels)
             const pct      = getPct(prog.actuel, obj.cible)
             const status   = getStatus(pct)
-
             return (
               <div key={obj.id} className="card-glass p-5">
                 <div className="flex items-start justify-between mb-3">
@@ -229,20 +226,12 @@ export default function ObjectifsPage() {
                     </button>
                   </div>
                 </div>
-
-                {/* Barre progression */}
                 <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-2">
-                  <div className={`h-full ${status.bg} rounded-full transition-all duration-700`}
-                    style={{ width: `${pct}%` }} />
+                  <div className={`h-full ${status.bg} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
                 </div>
-
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/40">
-                    {prog.actuel.toLocaleString('fr-FR')}{prog.unite} atteint
-                  </span>
-                  <span className="text-white/60 font-medium">
-                    {pct}% — cible : {obj.cible.toLocaleString('fr-FR')}{typeInfo.unit}
-                  </span>
+                  <span className="text-white/40">{prog.actuel.toLocaleString('fr-FR')}{prog.unite} atteint</span>
+                  <span className="text-white/60 font-medium">{pct}% — cible : {obj.cible.toLocaleString('fr-FR')}{typeInfo.unit}</span>
                 </div>
               </div>
             )
