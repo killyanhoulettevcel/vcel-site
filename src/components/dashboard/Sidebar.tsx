@@ -3,7 +3,7 @@ import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   Zap, LayoutDashboard, FileText, Users,
-  Activity, Settings, LogOut, Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload
+  Activity, Settings, LogOut, Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload, CalendarDays
 } from 'lucide-react'
 
 interface NavItem {
@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { label: 'CA & Finances',    href: '/dashboard/client/finances',    icon: Activity },
   { label: 'Factures',         href: '/dashboard/client/factures',    icon: FileText },
   { label: 'Leads CRM',        href: '/dashboard/client/leads',       icon: Users },
+  { label: 'Agenda',           href: '/dashboard/client/agenda',      icon: CalendarDays },
   { label: 'Workflows',        href: '/dashboard/client/workflows',   icon: Zap },
   { label: 'Coach IA',         href: '/dashboard/client/coach',       icon: Brain },
   { label: 'Suggestions prix', href: '/dashboard/client/prix',        icon: Euro },
