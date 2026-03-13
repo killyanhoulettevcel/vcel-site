@@ -99,11 +99,26 @@ export default function ProduitsPage() {
   const saveVente = async () => {
     setSaving(true)
     const produit = produits.find(p => p.id === formV.produit_id)
-    await fetch('/api/ventes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      ...formV,
-      produit_nom: produit?.nom || formV.produit_nom,
-    })})
-    setSaving(false); setShowModal(null); setFormV(emptyVente); refreshV()
+    const body = {
+      produit_id:    formV.produit_id || null,
+      produit_nom:   produit?.nom || formV.produit_nom,
+      quantite:      formV.quantite,
+      prix_unitaire: formV.prix_unitaire,
+      date_vente:    formV.date_vente,
+    }
+    const res = await fetch('/api/ventes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      console.error('Erreur vente:', err)
+    }
+    setSaving(false)
+    setShowModal(null)
+    setFormV(emptyVente)
+    refreshV()
   }
 
   const deleteVente = async (id: string) => {
