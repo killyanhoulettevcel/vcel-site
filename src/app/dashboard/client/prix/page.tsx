@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Plus, Zap, RefreshCw, AlertCircle, Target, Euro } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, Zap, RefreshCw, AlertCircle, Target, BarChart2 } from 'lucide-react'
 
 interface Suggestion {
   titre: string
@@ -19,6 +19,7 @@ interface PrixData {
   caMoyen: number
   tauxConversion: number
   montantMoyen: number
+  margeMoyenne: number
   error?: string
 }
 
@@ -35,32 +36,32 @@ const typeConfig = {
 }
 
 export default function PrixPage() {
-  const [data, setData]       = useState<PrixData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data,       setData]       = useState<PrixData | null>(null)
+  const [loading,    setLoading]    = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchSuggestions = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/prix')
+      const res  = await fetch('/api/prix')
       const json = await res.json()
       setData(json)
       setLastUpdate(new Date())
-    } catch { }
+    } catch {}
     setLoading(false)
   }
 
   useEffect(() => { fetchSuggestions() }, [])
 
   const scoreColor = (s: number) => s >= 70 ? 'text-green-400' : s >= 40 ? 'text-orange-400' : 'text-red-400'
-  const scoreBg    = (s: number) => s >= 70 ? 'bg-green-400' : s >= 40 ? 'bg-orange-400' : 'bg-red-400'
+  const scoreBg    = (s: number) => s >= 70 ? 'bg-green-400'   : s >= 40 ? 'bg-orange-400'   : 'bg-red-400'
 
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-white mb-1">Suggestions de prix</h1>
-          <p className="text-white/40 text-sm">Analyse IA de ton positionnement tarifaire</p>
+          <p className="text-white/40 text-sm">Analyse IA basée sur tes vrais produits et marges</p>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdate && (
@@ -78,8 +79,8 @@ export default function PrixPage() {
       {loading ? (
         <div className="card-glass p-12 text-center">
           <div className="w-8 h-8 border-2 border-white/20 border-t-blue-400 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/40 text-sm">Analyse de tes données en cours...</p>
-          <p className="text-white/20 text-xs mt-1">GPT analyse ton CA, tes leads et tes factures</p>
+          <p className="text-white/40 text-sm">Analyse de tes produits en cours...</p>
+          <p className="text-white/20 text-xs mt-1">GPT analyse tes prix, marges et ventes</p>
         </div>
       ) : data?.error ? (
         <div className="card-glass p-6 flex items-center gap-3">
@@ -88,11 +89,10 @@ export default function PrixPage() {
         </div>
       ) : data ? (
         <div className="space-y-5">
-
-          {/* Score santé + stats */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Score + stats */}
+          <div className="grid grid-cols-4 gap-4">
             <div className="card-glass p-5 col-span-1">
-              <p className="text-white/40 text-xs mb-2">Score santé tarifaire</p>
+              <p className="text-white/40 text-xs mb-2">Score tarifaire</p>
               <p className={`font-display text-4xl font-bold ${scoreColor(data.score_sante)}`}>
                 {data.score_sante}<span className="text-lg">/100</span>
               </p>
@@ -112,7 +112,17 @@ export default function PrixPage() {
             <div className="card-glass p-5">
               <p className="text-white/40 text-xs mb-1">Panier moyen</p>
               <p className="font-display text-2xl font-bold text-white">{data.montantMoyen}€</p>
-              <p className="text-white/30 text-xs mt-1">{data.tauxConversion}% de conversion</p>
+              <p className="text-white/30 text-xs mt-1">{data.tauxConversion}% conversion</p>
+            </div>
+            <div className="card-glass p-5">
+              <p className="text-white/40 text-xs mb-1">Marge moy. produits</p>
+              <p className={`font-display text-2xl font-bold ${
+                (data.margeMoyenne || 0) >= 30 ? 'text-green-400' :
+                (data.margeMoyenne || 0) >= 15 ? 'text-orange-400' : 'text-red-400'
+              }`}>{data.margeMoyenne || 0}%</p>
+              <p className="text-white/30 text-xs mt-1">
+                {(data.margeMoyenne || 0) >= 30 ? 'Bonne marge ✓' : (data.margeMoyenne || 0) >= 15 ? 'À améliorer' : 'Marge faible ⚠️'}
+              </p>
             </div>
           </div>
 
@@ -169,7 +179,6 @@ export default function PrixPage() {
               })}
             </div>
           </div>
-
         </div>
       ) : null}
     </div>
