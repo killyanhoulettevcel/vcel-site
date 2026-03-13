@@ -34,9 +34,13 @@ export async function GET(req: NextRequest) {
   const caTotal        = caData.reduce((s, d) => s + (d.ca_ht || 0), 0)
   const caMoyen        = caData.length > 0 ? Math.round(caTotal / caData.length) : 0
   const dernierCA      = caData[0]
-  const montantMoyen   = factures.length > 0
+  const montantMoyenFactures = factures.length > 0
     ? Math.round(factures.reduce((s, f) => s + (f.montant_ht || 0), 0) / factures.length)
     : 0
+  const montantMoyenVentes = ventes.length > 0
+    ? Math.round(ventes.reduce((s, v) => s + (v.total || 0), 0) / ventes.length)
+    : 0
+  const montantMoyen = montantMoyenFactures || montantMoyenVentes || 0
 
   // Calculs produits
   const moisActuel = new Date().toISOString().slice(0, 7)
