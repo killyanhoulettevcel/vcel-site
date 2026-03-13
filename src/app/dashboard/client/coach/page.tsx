@@ -35,7 +35,7 @@ export default function CoachPage() {
       const safe = async (url: string) => {
         try { const r = await fetch(url); return r.ok ? await r.json() : [] } catch { return [] }
       }
-      const [ca, leads, factures, workflows, obj, prix, rdv] = await Promise.all([
+      const [ca, leads, factures, workflows, obj, prix, rdv, produits, ventes] = await Promise.all([
         safe('/api/ca'),
         safe('/api/leads'),
         safe('/api/factures'),
@@ -43,9 +43,11 @@ export default function CoachPage() {
         safe('/api/objectifs'),
         safe('/api/prix'),
         safe('/api/calendar/today'),
+        safe('/api/produits'),
+        safe('/api/ventes'),
       ])
       setDashboardData({
-        ca, leads, factures, workflows,
+        ca, leads, factures, workflows, produits, ventes,
         objectifs:    obj?.objectifs || [],
         scorePrix:    prix?.score_sante || null,
         conseilPrix:  prix?.conseil_rapide || null,
