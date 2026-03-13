@@ -1,50 +1,60 @@
 'use client'
+import { useState } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   Zap, LayoutDashboard, FileText, Users, Activity, Settings, LogOut,
-  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload, CalendarDays, ShoppingBag
+  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload,
+  CalendarDays, ShoppingBag, Menu, X
 } from 'lucide-react'
 
 interface NavItem { label: string; href: string; icon: React.ElementType; adminOnly?: boolean }
 
 const navItems: NavItem[] = [
-  { label: 'Vue globale',      href: '/dashboard/admin',              icon: Shield,         adminOnly: true },
-  { label: 'Mon dashboard',    href: '/dashboard/client',             icon: LayoutDashboard },
-  { label: 'Démarrage',        href: '/dashboard/client/onboarding',  icon: Rocket },
-  { label: 'CA & Finances',    href: '/dashboard/client/finances',    icon: Activity },
-  { label: 'Factures',         href: '/dashboard/client/factures',    icon: FileText },
-  { label: 'Produits & Ventes',href: '/dashboard/client/produits',    icon: ShoppingBag },
-  { label: 'Leads CRM',        href: '/dashboard/client/leads',       icon: Users },
-  { label: 'Agenda',           href: '/dashboard/client/agenda',      icon: CalendarDays },
-  { label: 'Workflows',        href: '/dashboard/client/workflows',   icon: Zap },
-  { label: 'Coach IA',         href: '/dashboard/client/coach',       icon: Brain },
-  { label: 'Suggestions prix', href: '/dashboard/client/prix',        icon: Euro },
-  { label: 'Rentabilité',      href: '/dashboard/client/rentabilite', icon: Calculator },
-  { label: 'Objectifs',        href: '/dashboard/client/objectifs',   icon: Target },
-  { label: 'Importer CSV',     href: '/dashboard/client/import',      icon: Upload },
+  { label: 'Vue globale',       href: '/dashboard/admin',              icon: Shield,         adminOnly: true },
+  { label: 'Mon dashboard',     href: '/dashboard/client',             icon: LayoutDashboard },
+  { label: 'Démarrage',         href: '/dashboard/client/onboarding',  icon: Rocket },
+  { label: 'CA & Finances',     href: '/dashboard/client/finances',    icon: Activity },
+  { label: 'Factures',          href: '/dashboard/client/factures',    icon: FileText },
+  { label: 'Produits & Ventes', href: '/dashboard/client/produits',    icon: ShoppingBag },
+  { label: 'Leads CRM',         href: '/dashboard/client/leads',       icon: Users },
+  { label: 'Agenda',            href: '/dashboard/client/agenda',      icon: CalendarDays },
+  { label: 'Workflows',         href: '/dashboard/client/workflows',   icon: Zap },
+  { label: 'Coach IA',          href: '/dashboard/client/coach',       icon: Brain },
+  { label: 'Suggestions prix',  href: '/dashboard/client/prix',        icon: Euro },
+  { label: 'Rentabilité',       href: '/dashboard/client/rentabilite', icon: Calculator },
+  { label: 'Objectifs',         href: '/dashboard/client/objectifs',   icon: Target },
+  { label: 'Importer CSV',      href: '/dashboard/client/import',      icon: Upload },
 ]
 
 export default function Sidebar() {
   const { data: session } = useSession()
-  const pathname = usePathname()
+  const pathname  = usePathname()
+  const [open, setOpen] = useState(false)
   const role = (session?.user as any)?.role
   const nom  = session?.user?.name || 'Client'
   const items = navItems.filter(i => !i.adminOnly || role === 'admin')
 
-  return (
-    <aside className="w-64 min-h-screen bg-navy-900 border-r border-white/5 flex flex-col">
-      <div className="p-6 border-b border-white/5">
+  const NavContent = () => (
+    <>
+      {/* Logo */}
+      <div className="p-5 border-b border-white/5 flex items-center justify-between">
         <a href="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
             <Zap size={15} fill="white" className="text-white" />
           </div>
           <span className="font-display font-bold text-white">VCEL</span>
         </a>
+        {/* Fermer sur mobile */}
+        <button onClick={() => setOpen(false)} className="lg:hidden text-white/30 hover:text-white">
+          <X size={18} />
+        </button>
       </div>
+
+      {/* Profil */}
       <div className="px-4 py-4 border-b border-white/5">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
-          <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-sm font-bold">
+          <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-sm font-bold shrink-0">
             {nom.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -53,13 +63,17 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Nav */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {items.map((item) => {
           const active = pathname === item.href
           return (
-            <a key={item.href} href={item.href}
+            <a key={item.href} href={item.href} onClick={() => setOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                active
+                  ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
+                  : 'text-white/40 hover:text-white/70 hover:bg-white/5'
               }`}>
               <item.icon size={16} />
               {item.label}
@@ -68,10 +82,14 @@ export default function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Bas */}
       <div className="p-4 border-t border-white/5 space-y-1">
-        <a href="/dashboard/client/parametres"
+        <a href="/dashboard/client/parametres" onClick={() => setOpen(false)}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-            pathname === '/dashboard/client/parametres' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+            pathname === '/dashboard/client/parametres'
+              ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
+              : 'text-white/40 hover:text-white/70 hover:bg-white/5'
           }`}>
           <Settings size={16} /> Paramètres
         </a>
@@ -80,6 +98,38 @@ export default function Sidebar() {
           <LogOut size={16} /> Déconnexion
         </button>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* ── Topbar mobile ───────────────────────────────────────────────────── */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-navy-900 border-b border-white/5 flex items-center justify-between px-4">
+        <a href="/" className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center">
+            <Zap size={13} fill="white" className="text-white" />
+          </div>
+          <span className="font-display font-bold text-white text-sm">VCEL</span>
+        </a>
+        <button onClick={() => setOpen(true)} className="text-white/50 hover:text-white p-1">
+          <Menu size={22} />
+        </button>
+      </div>
+
+      {/* ── Overlay mobile ──────────────────────────────────────────────────── */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="relative w-72 max-w-[85vw] bg-navy-900 flex flex-col h-full shadow-2xl">
+            <NavContent />
+          </div>
+        </div>
+      )}
+
+      {/* ── Sidebar desktop ─────────────────────────────────────────────────── */}
+      <aside className="hidden lg:flex w-64 min-h-screen bg-navy-900 border-r border-white/5 flex-col shrink-0">
+        <NavContent />
+      </aside>
+    </>
   )
 }
