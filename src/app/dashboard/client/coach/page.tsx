@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
-import { Send, Sparkles, Brain, RefreshCw } from 'lucide-react'
+import { Send, Sparkles, Brain, RefreshCw, Calendar } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -15,47 +15,61 @@ const suggestions = [
   "J'ai l'impression de stagner...",
   "Qu'est-ce que je devrais prioriser ?",
   "Célèbre mes victoires avec moi 🎉",
-  "Je me sens seul dans mon business",
+  "Que disent mes RDV d'aujourd'hui ?",
 ]
 
 export default function CoachPage() {
   const { data: session } = useSession()
   const nom = session?.user?.name?.split(' ')[0] || 'toi'
 
-  const [messages, setMessages]     = useState<Message[]>([])
-  const [input, setInput]           = useState('')
-  const [loading, setLoading]       = useState(false)
+  const [messages, setMessages]         = useState<Message[]>([])
+  const [input, setInput]               = useState('')
+  const [loading, setLoading]           = useState(false)
   const [dashboardData, setDashboardData] = useState<any>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [rdvCount, setRdvCount]         = useState(0)
+  const bottomRef   = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Charger données dashboard
   useEffect(() => {
     const load = async () => {
       const safe = async (url: string) => {
         try { const r = await fetch(url); return r.ok ? await r.json() : [] } catch { return [] }
       }
-      const [ca, leads, factures, workflows, obj, prix] = await Promise.all([
-        safe('/api/ca'), safe('/api/leads'), safe('/api/factures'), safe('/api/workflows'),
-        safe('/api/objectifs'), safe('/api/prix')
+      const [ca, leads, factures, workflows, obj, prix, rdv] = await Promise.all([
+        safe('/api/ca'),
+        safe('/api/leads'),
+        safe('/api/factures'),
+        safe('/api/workflows'),
+        safe('/api/objectifs'),
+        safe('/api/prix'),
+        safe('/api/calendar/today'),
       ])
-      setDashboardData({ ca, leads, factures, workflows, objectifs: obj?.objectifs || [], scorePrix: prix?.score_sante || null, conseilPrix: prix?.conseil_rapide || null })
+      setDashboardData({
+        ca, leads, factures, workflows,
+        objectifs:    obj?.objectifs || [],
+        scorePrix:    prix?.score_sante || null,
+        conseilPrix:  prix?.conseil_rapide || null,
+        rdvAujourdhui: Array.isArray(rdv) ? rdv : [],
+      })
+      setRdvCount(Array.isArray(rdv) ? rdv.length : 0)
     }
     load()
   }, [])
 
-  // Message de bienvenue
   useEffect(() => {
     if (messages.length === 0) {
       const h = new Date().getHours()
       const salut = h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir'
+      const rdvLine = rdvCount > 0
+        ? `\n\nJe vois que tu as **${rdvCount} RDV** aujourd'hui — on peut en parler si tu veux te préparer.`
+        : ''
       setMessages([{
         role: 'assistant',
-        content: `${salut} ${nom} 👋\n\nJe suis ton coach business personnel. Je connais tes chiffres et tes objectifs — mais surtout, je suis là pour toi.\n\nL'entrepreneuriat peut être solitaire. Ici, pas de jugement. Parle-moi de où tu en es, ce qui te pèse, ce qui te motive. Ou pose-moi simplement une question sur ton business.\n\nComment tu vas aujourd'hui ?`,
+        content: `${salut} ${nom} 👋\n\nJe suis ton coach business personnel. Je connais tes chiffres, tes objectifs et ton agenda.${rdvLine}\n\nL'entrepreneuriat peut être solitaire. Ici, pas de jugement. Parle-moi de où tu en es, ce qui te pèse, ce qui te motive. Ou pose-moi simplement une question sur ton business.\n\nComment tu vas aujourd'hui ?`,
         ts: new Date()
       }])
     }
-  }, [nom])
+  }, [nom, rdvCount])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -76,9 +90,9 @@ export default function CoachPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          messages:      newMessages.map(m => ({ role: m.role, content: m.content })),
           dashboardData,
-          userName: nom,
+          userName:      nom,
         })
       })
       const data = await res.json()
@@ -87,7 +101,6 @@ export default function CoachPage() {
         content: data.reply || data.error || 'Erreur de connexion',
         ts: new Date()
       }])
-      // Recharger les données après une action
       if (data.action) {
         const safe = async (url: string) => { try { const r = await fetch(url); return r.ok ? await r.json() : null } catch { return null } }
         if (['objectif_created','objectif_updated','objectif_deleted'].includes(data.action)) {
@@ -102,13 +115,12 @@ export default function CoachPage() {
           const factures = await safe('/api/factures')
           if (factures) setDashboardData((prev: any) => ({ ...prev, factures: factures || [] }))
         }
-        // Déclencher le rafraîchissement des notifications
         window.dispatchEvent(new CustomEvent('coach:action', { detail: { action: data.action } }))
       }
     } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Désolé, je n\'arrive pas à me connecter. Vérifie ta clé OPENAI_API_KEY dans .env.local.',
+        content: 'Désolé, je n\'arrive pas à me connecter. Vérifie ta clé OPENAI_API_KEY.',
         ts: new Date()
       }])
     }
@@ -118,8 +130,6 @@ export default function CoachPage() {
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
-
-  const reset = () => setMessages([])
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -137,9 +147,17 @@ export default function CoachPage() {
             </div>
           </div>
         </div>
-        <button onClick={reset} className="btn-ghost text-xs py-2 px-3 gap-1.5">
-          <RefreshCw size={12} /> Nouvelle conversation
-        </button>
+        <div className="flex items-center gap-2">
+          {rdvCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs">
+              <Calendar size={12} />
+              {rdvCount} RDV aujourd'hui
+            </div>
+          )}
+          <button onClick={() => setMessages([])} className="btn-ghost text-xs py-2 px-3 gap-1.5">
+            <RefreshCw size={12} /> Nouvelle conversation
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -166,7 +184,6 @@ export default function CoachPage() {
           </div>
         ))}
 
-        {/* Typing indicator */}
         {loading && (
           <div className="flex gap-3 justify-start">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center shrink-0">
