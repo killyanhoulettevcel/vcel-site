@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
   const factures        = dashboardData?.factures || []
   const finances        = dashboardData?.ca || []
   const workflows       = dashboardData?.workflows || []
+  const produits        = dashboardData?.produits || []
+  const ventes          = dashboardData?.ventes || []
   const dernierCA       = finances[finances.length - 1]
   const avant_dernierCA = finances[finances.length - 2]
   const totalLeads      = leads.length
@@ -39,6 +41,26 @@ export async function POST(req: NextRequest) {
   const evolutionCA     = avant_dernierCA?.ca_ht > 0
     ? Math.round((((dernierCA?.ca_ht || 0) - avant_dernierCA.ca_ht) / avant_dernierCA.ca_ht) * 100)
     : null
+
+  // ── Produits & Ventes ────────────────────────────────────────────────────────
+  const now = new Date()
+  const moisActuel = now.toISOString().slice(0, 7)
+  const ventesCeMois = ventes.filter((v: any) => v.date_vente?.startsWith(moisActuel))
+  const caVentes     = ventesCeMois.reduce((s: number, v: any) => s + (v.total || 0), 0)
+  const bestSellers  = [...produits].sort((a: any, b: any) => {
+    const va = ventes.filter((v: any) => v.produit_id === a.id).reduce((s: number, v: any) => s + v.quantite, 0)
+    const vb = ventes.filter((v: any) => v.produit_id === b.id).reduce((s: number, v: any) => s + v.quantite, 0)
+    return vb - va
+  }).slice(0, 3)
+  const produitsTexte = produits.length > 0
+    ? produits.map((p: any) => `- ${p.nom} : ${p.prix_vente}€ · marge ${p.taux_marge}% · stock ${p.stock}`).join('\n')
+    : 'Aucun produit'
+  const bestSellersTexte = bestSellers.length > 0
+    ? bestSellers.map((p: any, i: number) => {
+        const qty = ventes.filter((v: any) => v.produit_id === p.id).reduce((s: number, v: any) => s + v.quantite, 0)
+        return `${i+1}. ${p.nom} — ${qty} ventes`
+      }).join('\n')
+    : 'Aucune vente enregistrée'
 
   // ── RDV du jour depuis Google Calendar ──────────────────────────────────────
   let rdvAujourdhui: any[] = []
@@ -84,6 +106,14 @@ Leads : ${totalLeads} total | ${leadsChauds.length} chauds | ${leadsConvertis} c
 Factures impayées : ${impayees.length} (${impayees.reduce((s: number, f: any) => s + (f.montant_ttc || 0), 0)}€)
 Workflows en erreur : ${wfErreurs}
 ${scorePrix !== null ? `Score santé tarifaire : ${scorePrix}/100` : ''}
+
+━━━ PRODUITS & VENTES ━━━
+CA ventes ce mois : ${caVentes.toLocaleString('fr-FR')}€ (${ventesCeMois.length} ventes)
+Produits : ${produits.length} actifs
+${produitsTexte}
+
+Best-sellers :
+${bestSellersTexte}
 
 ━━━ AGENDA DU JOUR ━━━
 ${rdvTexte}
