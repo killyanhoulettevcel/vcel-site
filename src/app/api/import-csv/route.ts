@@ -37,7 +37,7 @@ function transformCA(row: Record<string, string>, userId: string) {
     mois:        row.mois || '',
     ca_ht,
     charges,
-    marge:       ca_ht - charges,
+
     nb_factures: parseInt(row.nb_factures) || 0,
   }
 }
