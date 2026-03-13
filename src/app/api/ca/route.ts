@@ -5,32 +5,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { sheetsUpsert, getUserSheetId } from '@/lib/googleSheets'
 
-// Colonnes onglet "dashboard" :
-// mois, ca_ht, charges_total, marge_brute, taux_charges, tva_collectee,
-// tva_deductible, tva_solde, projection_fin_mois, nb_factures, nb_charges, numero_trimestre
-
 async function syncToSheet(userId: string, row: any) {
   try {
     const sheetId = await getUserSheetId(supabaseAdmin, userId)
     if (!sheetId) return
-    const caHt     = parseFloat(row.ca_ht)    || 0
-    const charges  = parseFloat(row.charges)  || 0
-    const marge    = caHt - charges
-    const taux     = caHt > 0 ? Math.round(charges / caHt * 100) : 0
-    const tva      = Math.round(caHt * 0.2)
+    const caHt    = parseFloat(row.ca_ht)   || 0
+    const charges = parseFloat(row.charges) || 0
+    const marge   = caHt - charges
+    const taux    = caHt > 0 ? Math.round(charges / caHt * 100) : 0
+    const tva     = Math.round(caHt * 0.2)
     await sheetsUpsert(sheetId, 'dashboard', 'A', row.mois, [
-      row.mois,        // mois
-      caHt,            // ca_ht
-      charges,         // charges_total
-      marge,           // marge_brute
-      taux,            // taux_charges
-      tva,             // tva_collectee
-      0,               // tva_deductible
-      tva,             // tva_solde
-      caHt,            // projection_fin_mois
-      row.nb_factures || 0, // nb_factures
-      0,               // nb_charges
-      Math.ceil(new Date().getMonth() / 3), // numero_trimestre
+      row.mois, caHt, charges, marge, taux, tva, 0, tva, caHt,
+      row.nb_factures || 0, 0,
+      Math.ceil(new Date().getMonth() / 3),
     ])
   } catch (e) {
     console.error('[CA] Erreur sync Sheets:', e)
@@ -61,13 +48,11 @@ export async function POST(req: NextRequest) {
       mois:        body.mois,
       ca_ht:       parseFloat(body.ca) || 0,
       charges:     parseFloat(body.charges) || 0,
-      marge:       (parseFloat(body.ca) || 0) - (parseFloat(body.charges) || 0),
       nb_factures: parseInt(body.nb_factures) || 0,
     })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  // Sync Google Sheets (non bloquant)
   syncToSheet(userId, data)
   return NextResponse.json(data, { status: 201 })
 }
@@ -78,10 +63,12 @@ export async function PUT(req: NextRequest) {
   const userId = (session.user as any).id
   const body   = await req.json()
   const { id, ...updates } = body
-  if (updates.ca !== undefined || updates.charges !== undefined) {
-    updates.ca_ht  = parseFloat(updates.ca) || 0
-    updates.marge  = (parseFloat(updates.ca) || 0) - (parseFloat(updates.charges) || 0)
+  if (updates.ca !== undefined) {
+    updates.ca_ht = parseFloat(updates.ca) || 0
     delete updates.ca
+  }
+  if (updates.charges !== undefined) {
+    updates.charges = parseFloat(updates.charges) || 0
   }
   const { data, error } = await supabaseAdmin
     .from('ca_data')
@@ -91,7 +78,6 @@ export async function PUT(req: NextRequest) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  // Sync Google Sheets (non bloquant)
   syncToSheet(userId, data)
   return NextResponse.json(data)
 }
