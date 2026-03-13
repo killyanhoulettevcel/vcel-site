@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check, Search, RefreshCw, Download } from 'lucide-react'
+import { Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check, Search, RefreshCw, Download, Loader, AlertCircle } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
 
@@ -37,12 +37,20 @@ const emptyForm = { nom: '', email: '', telephone: '', entreprise: '', secteur: 
 export default function LeadsPage() {
   const { data: leads, loading, lastUpdate, refresh } = useRealtimeData<Lead>('/api/leads', 'leads')
 
-  const [filtre, setFiltre]       = useState('tous')
-  const [search, setSearch]       = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [editLead, setEditLead]   = useState<Lead | null>(null)
-  const [form, setForm]           = useState(emptyForm)
-  const [saving, setSaving]       = useState(false)
+  const [filtre,   setFiltre]   = useState('tous')
+  const [search,   setSearch]   = useState('')
+  const [showModal,setShowModal]= useState(false)
+  const [editLead, setEditLead] = useState<Lead | null>(null)
+  const [form,     setForm]     = useState(emptyForm)
+  const [saving,   setSaving]   = useState(false)
+
+  // Relance
+  const [relancing,        setRelancing]        = useState<string | null>(null)
+  const [relanceOk,        setRelanceOk]        = useState<string | null>(null)
+  const [relanceErr,       setRelanceErr]       = useState<string | null>(null)
+  const [showRelanceModal, setShowRelanceModal] = useState(false)
+  const [relanceLead,      setRelanceLead]      = useState<Lead | null>(null)
+  const [relanceMessage,   setRelanceMessage]   = useState('')
 
   const filtered = leads
     .filter(l => filtre === 'tous' || l.statut === filtre)
@@ -66,9 +74,7 @@ export default function LeadsPage() {
     } else {
       await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     }
-    setSaving(false)
-    setShowModal(false)
-    refresh()
+    setSaving(false); setShowModal(false); refresh()
   }
 
   const changeStatut = async (id: string, statut: string) => {
@@ -80,6 +86,43 @@ export default function LeadsPage() {
     if (!confirm('Supprimer ce lead ?')) return
     await fetch(`/api/leads?id=${id}`, { method: 'DELETE' })
     refresh()
+  }
+
+  const openRelance = (l: Lead) => {
+    setRelanceLead(l)
+    setRelanceMessage('')
+    setRelanceErr(null)
+    setShowRelanceModal(true)
+  }
+
+  const handleRelance = async () => {
+    if (!relanceLead) return
+    setRelancing(relanceLead.id)
+    setRelanceErr(null)
+    try {
+      const res = await fetch('/api/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'relance_lead',
+          to:   relanceLead.email,
+          data: {
+            nomLead: relanceLead.nom,
+            message: relanceMessage || undefined,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Erreur envoi')
+      setRelanceOk(relanceLead.id)
+      setShowRelanceModal(false)
+      // Passer le statut à "contacté" automatiquement
+      await changeStatut(relanceLead.id, 'contacté')
+      setTimeout(() => setRelanceOk(null), 3000)
+    } catch (e: any) {
+      setRelanceErr(e.message)
+    }
+    setRelancing(null)
   }
 
   const chauds    = leads.filter(l => l.score === 'chaud').length
@@ -95,18 +138,17 @@ export default function LeadsPage() {
             {lastUpdate && (
               <span className="flex items-center gap-1.5 text-xs text-green-400/60">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                Mis à jour {lastUpdate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {lastUpdate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={refresh} className="btn-ghost text-sm py-2.5 px-4"><RefreshCw size={14} /></button>
-          <button onClick={() => exportCSV(leads, 'leads')} className="btn-ghost text-sm py-2.5 px-4" title="Exporter CSV"><Download size={14} /></button>
+          <button onClick={() => exportCSV(leads, 'leads')} className="btn-ghost text-sm py-2.5 px-4"><Download size={14} /></button>
           <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Nouveau lead</button>
         </div>
       </div>
-
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
@@ -128,8 +170,7 @@ export default function LeadsPage() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
             className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -184,6 +225,18 @@ export default function LeadsPage() {
                     ))}
                   </select>
                   <span className="text-white/20 text-xs hidden xl:block">{l.date}</span>
+
+                  {/* Bouton relance — uniquement si pas converti/perdu */}
+                  {!['converti','perdu'].includes(l.statut) && (
+                    <button onClick={() => openRelance(l)} title="Relancer par email"
+                      disabled={relancing === l.id}
+                      className={`p-1.5 transition-colors ${relanceOk === l.id ? 'text-green-400' : 'text-white/20 hover:text-orange-400'}`}>
+                      {relancing === l.id
+                        ? <Loader size={13} className="animate-spin" />
+                        : relanceOk === l.id ? <Check size={13} /> : <Mail size={13} />
+                      }
+                    </button>
+                  )}
                   <button onClick={() => openEdit(l)} className="text-white/20 hover:text-blue-400 transition-colors p-1.5"><Pencil size={13} /></button>
                   <button onClick={() => deleteLead(l.id)} className="text-white/20 hover:text-red-400 transition-colors p-1.5"><Trash2 size={13} /></button>
                 </div>
@@ -193,7 +246,45 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal relance lead */}
+      {showRelanceModal && relanceLead && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="card-glass w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display font-bold text-white text-sm">Relancer {relanceLead.nom}</h2>
+              <button onClick={() => setShowRelanceModal(false)} className="text-white/30 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="card-glass p-3 bg-white/3 text-xs text-white/40 space-y-1">
+                <p><span className="text-white/60">Email :</span> {relanceLead.email}</p>
+                {relanceLead.entreprise && <p><span className="text-white/60">Entreprise :</span> {relanceLead.entreprise}</p>}
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Message personnalisé (optionnel)</label>
+                <textarea value={relanceMessage} onChange={e => setRelanceMessage(e.target.value)}
+                  placeholder="Laissez vide pour utiliser le message par défaut..."
+                  rows={3}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 resize-none" />
+              </div>
+              <p className="text-white/20 text-xs">Le statut passera automatiquement à "contacté" après l'envoi.</p>
+              {relanceErr && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  <AlertCircle size={13} /> {relanceErr}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowRelanceModal(false)} className="btn-ghost flex-1 justify-center text-sm">Annuler</button>
+              <button onClick={handleRelance} disabled={!!relancing}
+                className="btn-primary flex-1 justify-center text-sm disabled:opacity-40">
+                {relancing ? <Loader size={14} className="animate-spin" /> : <><Mail size={14} /> Envoyer</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création/édition */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="card-glass w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
