@@ -3,7 +3,29 @@ import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
+import Stripe from 'stripe'
 import { supabaseAdmin } from '@/lib/supabase'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' })
+
+// Vérifie si un email a un abonnement Stripe actif
+async function hasActiveStripeSubscription(email: string): Promise<boolean> {
+  try {
+    const customers = await stripe.customers.list({ email, limit: 5 })
+    if (!customers.data.length) return false
+    for (const customer of customers.data) {
+      const subs = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: 'active',
+        limit: 1,
+      })
+      if (subs.data.length > 0) return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -44,71 +66,72 @@ export const authOptions: NextAuthOptions = {
         const email = user.email?.toLowerCase()
         if (!email) return false
 
+        // Vérifier si l'utilisateur existe déjà dans Supabase
         const { data: existing } = await supabaseAdmin
           .from('users')
           .select('id, role')
           .eq('email', email)
           .single()
 
-        if (!existing) {
-          const { data: newUser, error } = await supabaseAdmin
-            .from('users')
-            .insert({
-              email,
-              nom:           user.name  || email.split('@')[0],
-              avatar_url:    user.image || null,
-              role:          'client',
-              password_hash: '',
-              google_id:     account.providerAccountId,
-            })
-            .select('id, role')
-            .single()
-          if (error || !newUser) return false
-          user.id = newUser.id
-          ;(user as any).role = 'client'
-        } else {
+        if (existing) {
+          // Utilisateur existant — accès autorisé si admin ou client
+          if (!['admin', 'client'].includes(existing.role)) {
+            return '/login?error=no_subscription'
+          }
           await supabaseAdmin
             .from('users')
-            .update({
-              avatar_url: user.image,
-              google_id:  account.providerAccountId,
-            })
+            .update({ avatar_url: user.image, google_id: account.providerAccountId })
             .eq('email', email)
           user.id = existing.id
           ;(user as any).role = existing.role
+          return true
         }
+
+        // Nouvel utilisateur — vérifier abonnement Stripe
+        const hasSub = await hasActiveStripeSubscription(email)
+        if (!hasSub) {
+          return '/?no_subscription=1#tarifs'
+        }
+
+        // Créer le compte
+        const { data: newUser, error } = await supabaseAdmin
+          .from('users')
+          .insert({
+            email,
+            nom:           user.name  || email.split('@')[0],
+            avatar_url:    user.image || null,
+            role:          'client',
+            password_hash: '',
+            google_id:     account.providerAccountId,
+          })
+          .select('id, role')
+          .single()
+
+        if (error || !newUser) return false
+        user.id = newUser.id
+        ;(user as any).role = 'client'
       }
       return true
     },
 
-    async jwt({ token, user, account }) {
-      // Premier appel — juste après signIn
+    async jwt({ token, user }) {
       if (user) {
         token.uid  = user.id
         token.role = (user as any).role || 'client'
         return token
       }
-
-      // Appels suivants — vérifier que uid et role sont présents
-      if (!token.uid) {
-        // Connexion Google : retrouver l'utilisateur via email
-        if (token.email) {
-          const { data } = await supabaseAdmin
-            .from('users')
-            .select('id, role')
-            .eq('email', (token.email as string).toLowerCase())
-            .single()
-          if (data) {
-            token.uid  = data.id
-            token.role = data.role || 'client'
-          }
+      if (!token.uid && token.email) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('id, role')
+          .eq('email', (token.email as string).toLowerCase())
+          .single()
+        if (data) {
+          token.uid  = data.id
+          token.role = data.role || 'client'
         }
       }
-
-      if (!token.role) {
-        token.role = 'client'
-      }
-
+      if (!token.role) token.role = 'client'
       return token
     },
 
