@@ -1,7 +1,7 @@
 'use client'
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Users, FileText, Zap, AlertCircle, ArrowUpRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Users, FileText, Zap, AlertCircle, ArrowUpRight, ShoppingBag, Package } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar
@@ -14,7 +14,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <p className="text-white/50 mb-1">{label}</p>
       {payload.map((p: any) => (
         <p key={p.name} style={{ color: p.color }} className="font-semibold">
-          {p.name === 'ca' ? 'CA' : p.name === 'charges' ? 'Charges' : 'Leads'} : {p.value}{p.name !== 'leads' ? '€' : ''}
+          {p.name === 'ca_ht' ? 'CA' : p.name === 'charges' ? 'Charges' : p.name === 'leads' ? 'Leads' : p.name === 'ventes' ? 'Ventes' : p.name} : {p.value}{p.name !== 'leads' ? '€' : ''}
         </p>
       ))}
     </div>
@@ -25,11 +25,13 @@ export default function ClientDashboard() {
   const { data: session } = useSession()
   const nom = session?.user?.name?.split(' ')[0] || 'vous'
 
-  const [caData,      setCaData]      = useState<any[]>([])
-  const [leads,       setLeads]       = useState<any[]>([])
-  const [factures,    setFactures]    = useState<any[]>([])
-  const [workflows,   setWorkflows]   = useState<any[]>([])
-  const [loading,     setLoading]     = useState(true)
+  const [caData,    setCaData]    = useState<any[]>([])
+  const [leads,     setLeads]     = useState<any[]>([])
+  const [factures,  setFactures]  = useState<any[]>([])
+  const [workflows, setWorkflows] = useState<any[]>([])
+  const [produits,  setProduits]  = useState<any[]>([])
+  const [ventes,    setVentes]    = useState<any[]>([])
+  const [loading,   setLoading]   = useState(true)
 
   useEffect(() => {
     const safeFetch = async (url: string) => {
@@ -40,45 +42,62 @@ export default function ClientDashboard() {
         return Array.isArray(data) ? data : []
       } catch { return [] }
     }
-
     const fetchAll = async () => {
-      const [ca, ld, fa, wf] = await Promise.all([
+      const [ca, ld, fa, wf, pr, ve] = await Promise.all([
         safeFetch('/api/ca'),
         safeFetch('/api/leads'),
         safeFetch('/api/factures'),
         safeFetch('/api/workflows'),
+        safeFetch('/api/produits'),
+        safeFetch('/api/ventes'),
       ])
-      setCaData(ca)
-      setLeads(ld)
-      setFactures(fa)
-      setWorkflows(wf)
+      setCaData(ca); setLeads(ld); setFactures(fa)
+      setWorkflows(wf); setProduits(pr); setVentes(ve)
       setLoading(false)
     }
     fetchAll()
   }, [])
 
-  // ── KPIs calculés ──────────────────────────────────────────────────────────
+  // ── KPIs ──────────────────────────────────────────────────────────────────
   const dernierMois  = caData[caData.length - 1]
   const avantDernier = caData[caData.length - 2]
   const diffCA = dernierMois && avantDernier && avantDernier.ca_ht > 0
     ? Math.round((dernierMois.ca_ht - avantDernier.ca_ht) / avantDernier.ca_ht * 100)
     : null
 
-  // Leads ce mois
   const now = new Date()
-  const leadscemois = leads.filter(l => {
-    if (!l.date) return false
-    const d = new Date(l.date)
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-  }).length
+  const moisActuel = now.toISOString().slice(0, 7)
 
-  // Factures impayées
-  const impayees   = factures.filter(f => f.statut !== 'payée')
-  const montantDu  = impayees.reduce((s, f) => s + (f.montant_ttc || 0), 0)
+  const leadsCeMois = leads.filter(l => l.date?.startsWith(moisActuel)).length
+  const impayees    = factures.filter(f => f.statut !== 'payée')
+  const montantDu   = impayees.reduce((s, f) => s + (f.montant_ttc || 0), 0)
+  const wfActifs    = workflows.filter(w => w.actif).length
+  const wfErreurs   = workflows.filter(w => w.statut === 'erreur').length
 
-  // Workflows
-  const wfActifs  = workflows.filter(w => w.actif).length
-  const wfErreurs = workflows.filter(w => w.statut === 'erreur').length
+  // Ventes ce mois
+  const ventesCeMois     = ventes.filter(v => v.date_vente?.startsWith(moisActuel))
+  const caVentesCeMois   = ventesCeMois.reduce((s, v) => s + (v.total || 0), 0)
+  const nbVentesCeMois   = ventesCeMois.length
+
+  // Best-sellers
+  const bestSellers = [...produits].sort((a, b) => {
+    const va = ventes.filter(v => v.produit_id === a.id).reduce((s, v) => s + v.quantite, 0)
+    const vb = ventes.filter(v => v.produit_id === b.id).reduce((s, v) => s + v.quantite, 0)
+    return vb - va
+  }).slice(0, 3)
+
+  // CA enrichi avec ventes pour le graphique
+  const caChartData = caData.map(m => {
+    const ventesMonth = ventes
+      .filter(v => {
+        if (!v.date_vente) return false
+        const d = new Date(v.date_vente)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === m.mois?.slice(0, 7) ||
+               v.date_vente?.slice(0, 7) === m.mois?.slice(0, 7)
+      })
+      .reduce((s, v) => s + (v.total || 0), 0)
+    return { ...m, ventes: Math.round(ventesMonth) }
+  })
 
   // Leads par jour cette semaine
   const joursNoms = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
@@ -89,7 +108,6 @@ export default function ClientDashboard() {
     const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
     if (diff <= 6) leadsParJour[d.getDay()].leads++
   })
-  // Réordonner Lun → Dim
   const leadsData = [...leadsParJour.slice(1), leadsParJour[0]]
 
   const kpis = [
@@ -101,8 +119,15 @@ export default function ClientDashboard() {
       icon: TrendingUp,
     },
     {
+      label: 'Ventes ce mois',
+      value: `${caVentesCeMois.toLocaleString('fr-FR')}€`,
+      sub: `${nbVentesCeMois} vente${nbVentesCeMois > 1 ? 's' : ''} · ${produits.length} produits`,
+      trend: nbVentesCeMois > 0 ? 'up' : 'warn',
+      icon: ShoppingBag,
+    },
+    {
       label: 'Leads ce mois',
-      value: String(leadscemois),
+      value: String(leadsCeMois),
       sub: `${leads.length} leads au total`,
       trend: 'up',
       icon: Users,
@@ -113,13 +138,6 @@ export default function ClientDashboard() {
       sub: impayees.length > 0 ? `${montantDu.toLocaleString('fr-FR')}€ en attente` : 'Tout est à jour ✓',
       trend: impayees.length > 0 ? 'warn' : 'up',
       icon: FileText,
-    },
-    {
-      label: 'Workflows actifs',
-      value: `${wfActifs}/8`,
-      sub: wfErreurs > 0 ? `${wfErreurs} en erreur` : 'Tous opérationnels ✓',
-      trend: wfErreurs > 0 ? 'warn' : 'up',
-      icon: Zap,
     },
   ]
 
@@ -167,7 +185,7 @@ export default function ClientDashboard() {
         <div className="lg:col-span-2 card-glass p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="font-display font-semibold text-white text-sm">Évolution CA</h2>
+              <h2 className="font-display font-semibold text-white text-sm">Évolution CA & Ventes</h2>
               <p className="text-white/30 text-xs">{caData.length} mois de données</p>
             </div>
             <a href="/dashboard/client/finances" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
@@ -180,7 +198,7 @@ export default function ClientDashboard() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={caData}>
+              <AreaChart data={caChartData}>
                 <defs>
                   <linearGradient id="caGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
@@ -190,13 +208,18 @@ export default function ClientDashboard() {
                     <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
+                  <linearGradient id="ventesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="mois" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="ca_ht" stroke="#3B82F6" strokeWidth={2} fill="url(#caGrad)" />
+                <Area type="monotone" dataKey="ca_ht"   stroke="#3B82F6" strokeWidth={2} fill="url(#caGrad)" />
                 <Area type="monotone" dataKey="charges" stroke="#6366f1" strokeWidth={2} fill="url(#chargesGrad)" />
+                <Area type="monotone" dataKey="ventes"  stroke="#10b981" strokeWidth={2} fill="url(#ventesGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -224,38 +247,77 @@ export default function ClientDashboard() {
         </div>
       </div>
 
-      {/* Workflows */}
-      <div className="card-glass p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display font-semibold text-white text-sm">Statut des workflows</h2>
-          <a href="/dashboard/client/workflows" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-            Gérer <ArrowUpRight size={12} />
-          </a>
-        </div>
-        {workflows.length === 0 ? (
-          <p className="text-white/20 text-sm text-center py-6">Aucun workflow configuré</p>
-        ) : (
-          <div className="space-y-2">
-            {workflows.slice(0, 5).map((w) => (
-              <div key={w.id || w.nom} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    w.statut === 'ok' ? 'bg-green-400 shadow-sm shadow-green-400/50' : 'bg-red-400 animate-pulse'
-                  }`} />
-                  <span className="text-white/70 text-sm">{w.nom}</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-white/30">
-                 <span>{w.nb_executions_mois || 0} exec.</span>
-                  <span className={`px-2 py-0.5 rounded-full font-medium ${
-                    w.statut === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                  }`}>
-                    {w.statut === 'ok' ? '✓ Actif' : '✗ Erreur'}
-                  </span>
-                </div>
-              </div>
-            ))}
+      {/* Best-sellers + Workflows */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Best-sellers */}
+        <div className="card-glass p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-display font-semibold text-white text-sm">🏆 Best-sellers</h2>
+            <a href="/dashboard/client/produits" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+              Produits <ArrowUpRight size={12} />
+            </a>
           </div>
-        )}
+          {bestSellers.length === 0 ? (
+            <div className="text-center py-6">
+              <Package size={24} className="text-white/10 mx-auto mb-2" />
+              <p className="text-white/20 text-xs">Aucun produit — ajoutez-en dans Produits & Ventes</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {bestSellers.map((p, i) => {
+                const qty    = ventes.filter(v => v.produit_id === p.id).reduce((s, v) => s + v.quantite, 0)
+                const ca     = ventes.filter(v => v.produit_id === p.id).reduce((s, v) => s + (v.total || 0), 0)
+                const medals = ['🥇','🥈','🥉']
+                return (
+                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{medals[i]}</span>
+                      <div>
+                        <p className="text-white text-xs font-medium">{p.nom}</p>
+                        <p className="text-white/30 text-xs">{qty} ventes · marge {p.taux_marge}%</p>
+                      </div>
+                    </div>
+                    <span className="text-green-400 text-xs font-semibold">{ca.toLocaleString('fr-FR')}€</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Workflows */}
+        <div className="card-glass p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-display font-semibold text-white text-sm">Statut des workflows</h2>
+            <a href="/dashboard/client/workflows" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+              Gérer <ArrowUpRight size={12} />
+            </a>
+          </div>
+          {workflows.length === 0 ? (
+            <p className="text-white/20 text-sm text-center py-6">Aucun workflow configuré</p>
+          ) : (
+            <div className="space-y-2">
+              {workflows.slice(0, 5).map((w) => (
+                <div key={w.id || w.nom} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${
+                      w.statut === 'ok' ? 'bg-green-400 shadow-sm shadow-green-400/50' : 'bg-red-400 animate-pulse'
+                    }`} />
+                    <span className="text-white/70 text-sm">{w.nom}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-white/30">
+                    <span>{w.nb_executions_mois || 0} exec.</span>
+                    <span className={`px-2 py-0.5 rounded-full font-medium ${
+                      w.statut === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                    }`}>
+                      {w.statut === 'ok' ? '✓ Actif' : '✗ Erreur'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
