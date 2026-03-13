@@ -1,9 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { FileText, AlertCircle, CheckCircle, Clock, Plus, Pencil, Trash2, X, Check, RefreshCw, Download } from 'lucide-react'
+import { FileText, AlertCircle, CheckCircle, Clock, Plus, Pencil, Trash2, X, Check, RefreshCw, Download, Mail, Loader } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
-
 
 interface Facture {
   id: string
@@ -14,6 +13,8 @@ interface Facture {
   montant_ttc: number
   statut: 'payée' | 'en attente' | 'en retard'
   stripe_invoice_id?: string
+  email_client?: string
+  nom_client?: string
 }
 
 const statutConfig: Record<string, { label: string, color: string, icon: React.ElementType }> = {
@@ -22,24 +23,32 @@ const statutConfig: Record<string, { label: string, color: string, icon: React.E
   'en retard':  { label: 'En retard',  color: 'bg-red-500/10 text-red-400',      icon: AlertCircle },
 }
 
-const emptyForm = { numero_facture: '', date_facture: '', montant_ht: '', tva: '', montant_ttc: '', statut: 'en attente' as const }
+const emptyForm = {
+  numero_facture: '', date_facture: '', montant_ht: '', tva: '', montant_ttc: '',
+  statut: 'en attente' as const, email_client: '', nom_client: '',
+}
 
 export default function FacturesPage() {
   const { data: factures, loading, lastUpdate, refresh } = useRealtimeData<Facture>('/api/factures', 'factures')
 
-  const [filtre, setFiltre]       = useState('toutes')
-  const [showModal, setShowModal] = useState(false)
-  const [editItem, setEditItem]   = useState<Facture | null>(null)
-  const [form, setForm]           = useState(emptyForm)
-  const [saving, setSaving]       = useState(false)
+  const [filtre,      setFiltre]      = useState('toutes')
+  const [showModal,   setShowModal]   = useState(false)
+  const [editItem,    setEditItem]    = useState<Facture | null>(null)
+  const [form,        setForm]        = useState(emptyForm)
+  const [saving,      setSaving]      = useState(false)
+  const [relancing,   setRelancing]   = useState<string | null>(null)
+  const [relanceOk,   setRelanceOk]   = useState<string | null>(null)
+  const [relanceErr,  setRelanceErr]  = useState<string | null>(null)
+  const [showRelanceModal, setShowRelanceModal] = useState(false)
+  const [relanceFacture,   setRelanceFacture]   = useState<Facture | null>(null)
+  const [emailRelance,     setEmailRelance]     = useState('')
 
-  const filtered = filtre === 'toutes' ? factures : factures.filter(f => f.statut === filtre)
-
+  const filtered    = filtre === 'toutes' ? factures : factures.filter(f => f.statut === filtre)
   const totalImpayé = factures.filter(f => f.statut !== 'payée').reduce((s, f) => s + (f.montant_ttc || 0), 0)
   const totalCA     = factures.filter(f => f.statut === 'payée').reduce((s, f) => s + (f.montant_ht || 0), 0)
 
   const handleHtChange = (val: string) => {
-    const ht = parseFloat(val) || 0
+    const ht  = parseFloat(val) || 0
     const tva = ht * 0.2
     setForm(f => ({ ...f, montant_ht: val, tva: tva.toFixed(2), montant_ttc: (ht + tva).toFixed(2) }))
   }
@@ -47,7 +56,11 @@ export default function FacturesPage() {
   const openCreate = () => { setEditItem(null); setForm(emptyForm); setShowModal(true) }
   const openEdit   = (f: Facture) => {
     setEditItem(f)
-    setForm({ numero_facture: f.numero_facture, date_facture: f.date_facture, montant_ht: String(f.montant_ht), tva: String(f.tva), montant_ttc: String(f.montant_ttc), statut: f.statut })
+    setForm({
+      numero_facture: f.numero_facture, date_facture: f.date_facture,
+      montant_ht: String(f.montant_ht), tva: String(f.tva), montant_ttc: String(f.montant_ttc),
+      statut: f.statut, email_client: f.email_client || '', nom_client: f.nom_client || '',
+    })
     setShowModal(true)
   }
 
@@ -58,9 +71,7 @@ export default function FacturesPage() {
     } else {
       await fetch('/api/factures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     }
-    setSaving(false)
-    setShowModal(false)
-    refresh()
+    setSaving(false); setShowModal(false); refresh()
   }
 
   const deleteFacture = async (id: string) => {
@@ -74,6 +85,43 @@ export default function FacturesPage() {
     refresh()
   }
 
+  const openRelance = (f: Facture) => {
+    setRelanceFacture(f)
+    setEmailRelance(f.email_client || '')
+    setRelanceErr(null)
+    setShowRelanceModal(true)
+  }
+
+  const handleRelance = async () => {
+    if (!relanceFacture || !emailRelance) return
+    setRelancing(relanceFacture.id)
+    setRelanceErr(null)
+    try {
+      const res = await fetch('/api/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'relance_facture',
+          to:   emailRelance,
+          data: {
+            nomClient:     relanceFacture.nom_client || emailRelance,
+            numeroFacture: relanceFacture.numero_facture,
+            montant:       relanceFacture.montant_ttc,
+            dateEcheance:  relanceFacture.date_facture,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Erreur envoi')
+      setRelanceOk(relanceFacture.id)
+      setShowRelanceModal(false)
+      setTimeout(() => setRelanceOk(null), 3000)
+    } catch (e: any) {
+      setRelanceErr(e.message)
+    }
+    setRelancing(null)
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -84,19 +132,17 @@ export default function FacturesPage() {
             {lastUpdate && (
               <span className="flex items-center gap-1.5 text-xs text-green-400/60">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                Mis à jour {lastUpdate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {lastUpdate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => exportCSV(factures, 'factures')} className="btn-ghost text-sm py-2.5 px-4" title="Exporter CSV"><Download size={14} /></button>
+          <button onClick={() => exportCSV(factures, 'factures')} className="btn-ghost text-sm py-2.5 px-4"><Download size={14} /></button>
           <button onClick={refresh} className="btn-ghost text-sm py-2.5 px-4"><RefreshCw size={14} /></button>
           <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Nouvelle facture</button>
         </div>
       </div>
-
-    
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
@@ -149,7 +195,7 @@ export default function FacturesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/5">
-                  {['N° Facture', 'Date', 'Montant HT', 'TVA', 'TTC', 'Statut', ''].map(h => (
+                  {['N° Facture', 'Client', 'Date', 'HT', 'TVA', 'TTC', 'Statut', ''].map(h => (
                     <th key={h} className="text-left text-xs text-white/30 font-medium pb-3 pr-4">{h}</th>
                   ))}
                 </tr>
@@ -162,6 +208,12 @@ export default function FacturesPage() {
                         <FileText size={13} className="text-blue-400" />
                         <span className="text-white text-xs font-mono">{f.numero_facture}</span>
                         {f.stripe_invoice_id && <span className="text-xs text-blue-400/40">Stripe</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <div>
+                        <p className="text-white/70 text-xs">{f.nom_client || '—'}</p>
+                        {f.email_client && <p className="text-white/30 text-xs">{f.email_client}</p>}
                       </div>
                     </td>
                     <td className="py-3 pr-4 text-white/40 text-xs">{f.date_facture}</td>
@@ -178,6 +230,24 @@ export default function FacturesPage() {
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-1.5">
+                        {/* Bouton relancer — uniquement si pas payée */}
+                        {f.statut !== 'payée' && (
+                          <button onClick={() => openRelance(f)}
+                            title="Relancer par email"
+                            disabled={relancing === f.id}
+                            className={`p-1 transition-colors ${
+                              relanceOk === f.id
+                                ? 'text-green-400'
+                                : 'text-white/20 hover:text-orange-400'
+                            }`}>
+                            {relancing === f.id
+                              ? <Loader size={13} className="animate-spin" />
+                              : relanceOk === f.id
+                                ? <Check size={13} />
+                                : <Mail size={13} />
+                            }
+                          </button>
+                        )}
                         <button onClick={() => openEdit(f)} className="text-white/20 hover:text-blue-400 transition-colors p-1"><Pencil size={13} /></button>
                         <button onClick={() => deleteFacture(f.id)} className="text-white/20 hover:text-red-400 transition-colors p-1"><Trash2 size={13} /></button>
                       </div>
@@ -190,7 +260,44 @@ export default function FacturesPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal relance */}
+      {showRelanceModal && relanceFacture && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="card-glass w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display font-bold text-white text-sm">Relancer la facture {relanceFacture.numero_facture}</h2>
+              <button onClick={() => setShowRelanceModal(false)} className="text-white/30 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Email du client *</label>
+                <input type="email" value={emailRelance} onChange={e => setEmailRelance(e.target.value)}
+                  placeholder="client@exemple.fr"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
+              </div>
+              <div className="card-glass p-4 bg-white/3 text-xs text-white/40 space-y-1">
+                <p><span className="text-white/60">Facture :</span> {relanceFacture.numero_facture}</p>
+                <p><span className="text-white/60">Montant :</span> {relanceFacture.montant_ttc.toLocaleString('fr-FR')}€ TTC</p>
+                <p><span className="text-white/60">Date :</span> {relanceFacture.date_facture}</p>
+              </div>
+              {relanceErr && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  <AlertCircle size={13} /> {relanceErr}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowRelanceModal(false)} className="btn-ghost flex-1 justify-center text-sm">Annuler</button>
+              <button onClick={handleRelance} disabled={!emailRelance || !!relancing}
+                className="btn-primary flex-1 justify-center text-sm disabled:opacity-40">
+                {relancing ? <Loader size={14} className="animate-spin" /> : <><Mail size={14} /> Envoyer la relance</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création/édition */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="card-glass w-full max-w-md p-6">
@@ -199,6 +306,20 @@ export default function FacturesPage() {
               <button onClick={() => setShowModal(false)} className="text-white/30 hover:text-white"><X size={18} /></button>
             </div>
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Nom client</label>
+                  <input value={form.nom_client} onChange={e => setForm({...form, nom_client: e.target.value})}
+                    placeholder="Jean Dupont"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Email client</label>
+                  <input type="email" value={form.email_client} onChange={e => setForm({...form, email_client: e.target.value})}
+                    placeholder="client@exemple.fr"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">N° Facture *</label>
                 <input value={form.numero_facture} onChange={e => setForm({...form, numero_facture: e.target.value})}
