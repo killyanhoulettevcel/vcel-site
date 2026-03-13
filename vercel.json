@@ -6,3 +6,12 @@
     }
   ]
 }
+
+{
+  "crons": [
+    {
+      "path": "/api/cron/relances",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}
