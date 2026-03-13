@@ -7,18 +7,15 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // ── Google OAuth ─────────────────────────────────────────────────────────
     GoogleProvider({
       clientId:     process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
-
-    // ── Email / Mot de passe ─────────────────────────────────────────────────
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email:    { label: 'Email',         type: 'email' },
-        password: { label: 'Mot de passe',  type: 'password' },
+        email:    { label: 'Email',        type: 'email' },
+        password: { label: 'Mot de passe', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
@@ -30,19 +27,23 @@ export const authOptions: NextAuthOptions = {
         if (error || !user) return null
         const valid = await bcrypt.compare(credentials.password, user.password_hash)
         if (!valid) return null
-        return { id: user.id, email: user.email, name: user.nom, role: user.role }
+        return {
+          id:    user.id,
+          email: user.email,
+          name:  user.nom,
+          image: user.avatar_url || null,
+          role:  user.role,
+        }
       },
     }),
   ],
 
   callbacks: {
-    // Créer ou récupérer l'utilisateur Google dans Supabase
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
         const email = user.email?.toLowerCase()
         if (!email) return false
 
-        // Vérifier si l'utilisateur existe déjà
         const { data: existing } = await supabaseAdmin
           .from('users')
           .select('id, role')
@@ -50,70 +51,71 @@ export const authOptions: NextAuthOptions = {
           .single()
 
         if (!existing) {
-          // Créer le compte automatiquement
           const { data: newUser, error } = await supabaseAdmin
             .from('users')
             .insert({
               email,
-              nom:          user.name  || email.split('@')[0],
-              avatar_url:   user.image || null,
-              role:         'client',
-              password_hash: '', // pas de mot de passe pour Google
-              google_id:    user.id,
+              nom:           user.name  || email.split('@')[0],
+              avatar_url:    user.image || null,
+              role:          'client',
+              password_hash: '',
+              google_id:     account.providerAccountId,
             })
             .select('id, role')
             .single()
-
           if (error || !newUser) return false
-          user.id   = newUser.id
-          ;(user as any).role = newUser.role
+          user.id = newUser.id
+          ;(user as any).role = 'client'
         } else {
-          // Mettre à jour l'avatar si besoin
           await supabaseAdmin
             .from('users')
-            .update({ avatar_url: user.image, google_id: user.id })
+            .update({
+              avatar_url: user.image,
+              google_id:  account.providerAccountId,
+            })
             .eq('email', email)
-
-          user.id   = existing.id
+          user.id = existing.id
           ;(user as any).role = existing.role
         }
       }
       return true
     },
 
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      // Premier appel — juste après signIn
       if (user) {
-        token['uid']  = user.id
-        token['role'] = (user as any).role || 'client'
+        token.uid  = user.id
+        token.role = (user as any).role || 'client'
+        return token
       }
-      // Fallback : si role manquant, le chercher dans Supabase
-      if (!token['role'] && token['uid']) {
-        const { data } = await supabaseAdmin
-          .from('users')
-          .select('role')
-          .eq('id', token['uid'])
-          .single()
-        token['role'] = data?.role || 'client'
-      }
-      // Fallback : si uid manquant (Google), utiliser token.sub
-      if (!token['uid'] && token.sub) {
-        const { data } = await supabaseAdmin
-          .from('users')
-          .select('id, role')
-          .eq('google_id', token.sub)
-          .single()
-        if (data) {
-          token['uid']  = data.id
-          token['role'] = data.role || 'client'
+
+      // Appels suivants — vérifier que uid et role sont présents
+      if (!token.uid) {
+        // Connexion Google : retrouver l'utilisateur via email
+        if (token.email) {
+          const { data } = await supabaseAdmin
+            .from('users')
+            .select('id, role')
+            .eq('email', (token.email as string).toLowerCase())
+            .single()
+          if (data) {
+            token.uid  = data.id
+            token.role = data.role || 'client'
+          }
         }
       }
+
+      if (!token.role) {
+        token.role = 'client'
+      }
+
       return token
     },
 
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id   = token['uid']
-        (session.user as any).role = token['role']
+      if (session?.user) {
+        (session.user as any).id   = token.uid   || token.sub
+        (session.user as any).role = token.role  || 'client'
       }
       return session
     },
