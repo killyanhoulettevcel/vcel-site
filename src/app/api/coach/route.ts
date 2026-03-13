@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { getValidToken, getTodayEvents } from '@/lib/googleCalendar'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -14,30 +15,48 @@ export async function POST(req: NextRequest) {
   const { messages, dashboardData, userName } = await req.json()
 
   // Données business enrichies
-  const objectifs      = dashboardData?.objectifs || []
-  const leads          = dashboardData?.leads || []
-  const factures       = dashboardData?.factures || []
-  const finances       = dashboardData?.ca || []
-  const workflows      = dashboardData?.workflows || []
-  const dernierCA      = finances[finances.length - 1]
+  const objectifs       = dashboardData?.objectifs || []
+  const leads           = dashboardData?.leads || []
+  const factures        = dashboardData?.factures || []
+  const finances        = dashboardData?.ca || []
+  const workflows       = dashboardData?.workflows || []
+  const dernierCA       = finances[finances.length - 1]
   const avant_dernierCA = finances[finances.length - 2]
-  const totalLeads     = leads.length
-  const leadsChauds    = leads.filter((l: any) => l.score === 'chaud')
+  const totalLeads      = leads.length
+  const leadsChauds     = leads.filter((l: any) => l.score === 'chaud')
   const il7jours = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const leadsNonContactes = leadsChauds.filter((l: any) => {
     if (l.statut === 'converti' || l.statut === 'perdu') return false
     if (l.derniere_relance && new Date(l.derniere_relance) > il7jours) return false
     return true
   })
-  const leadsConvertis = leads.filter((l: any) => l.statut === 'converti').length
-  const impayees       = factures.filter((f: any) => f.statut !== 'payée')
-  const wfErreurs      = workflows.filter((w: any) => w.statut === 'erreur').length
-  const scorePrix      = dashboardData?.scorePrix || null
-  const secteur        = dashboardData?.secteur || null
-  const tauxConversion = totalLeads > 0 ? Math.round(leadsConvertis / totalLeads * 100) : 0
-  const evolutionCA    = avant_dernierCA?.ca_ht > 0
+  const leadsConvertis  = leads.filter((l: any) => l.statut === 'converti').length
+  const impayees        = factures.filter((f: any) => f.statut !== 'payée')
+  const wfErreurs       = workflows.filter((w: any) => w.statut === 'erreur').length
+  const scorePrix       = dashboardData?.scorePrix || null
+  const secteur         = dashboardData?.secteur || null
+  const tauxConversion  = totalLeads > 0 ? Math.round(leadsConvertis / totalLeads * 100) : 0
+  const evolutionCA     = avant_dernierCA?.ca_ht > 0
     ? Math.round((((dernierCA?.ca_ht || 0) - avant_dernierCA.ca_ht) / avant_dernierCA.ca_ht) * 100)
     : null
+
+  // ── RDV du jour depuis Google Calendar ──────────────────────────────────────
+  let rdvAujourdhui: any[] = []
+  try {
+    const token = await getValidToken(supabaseAdmin, userId)
+    rdvAujourdhui = await getTodayEvents(token)
+  } catch { /* Calendar non connecté, pas bloquant */ }
+
+  const rdvTexte = rdvAujourdhui.length > 0
+    ? rdvAujourdhui.map((e: any) => {
+        const heure = e.start?.dateTime
+          ? new Date(e.start.dateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          : 'Journée entière'
+        const lieu = e.location ? ` @ ${e.location}` : ''
+        const participants = e.attendees?.length ? ` (${e.attendees.map((a: any) => a.email).join(', ')})` : ''
+        return `- ${heure}${lieu} : ${e.summary}${participants}`
+      }).join('\n')
+    : 'Aucun RDV aujourd\'hui'
 
   const objectifsTexte = objectifs.length > 0
     ? objectifs.map((o: any) => `- ${o.label} : cible ${o.cible}${o.type === 'ca' ? '€' : o.type === 'conversion' ? '%' : ''} (${o.periode}) — ID: ${o.id}`).join('\n')
@@ -66,6 +85,9 @@ Factures impayées : ${impayees.length} (${impayees.reduce((s: number, f: any) =
 Workflows en erreur : ${wfErreurs}
 ${scorePrix !== null ? `Score santé tarifaire : ${scorePrix}/100` : ''}
 
+━━━ AGENDA DU JOUR ━━━
+${rdvTexte}
+
 ━━━ LEADS CHAUDS NON CONTACTÉS ━━━
 ${leadsChaudsTexte}
 
@@ -81,30 +103,31 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
 1. Créer un objectif :
 {"action":"create_objectif","data":{"type":"ca|leads|conversion|factures|custom","label":"texte","cible":nombre,"periode":"mensuel|annuel"}}
 
-2. Modifier un objectif existant (corriger si irréaliste) :
+2. Modifier un objectif existant :
 {"action":"update_objectif","data":{"id":"uuid","label":"texte","cible":nombre,"periode":"mensuel|annuel"}}
 
 3. Supprimer un objectif :
 {"action":"delete_objectif","data":{"id":"uuid"}}
 
-4. Relancer les leads chauds disponibles (adapte-toi au nombre réel, ne relance jamais les mêmes avant 7 jours) :
-{"action":"relancer_leads","data":{"ids":["id1","id2"],"message_coach":"Message de motivation court pour accompagner l'action"}}
+4. Relancer les leads chauds :
+{"action":"relancer_leads","data":{"ids":["id1","id2"],"message_coach":"Message court"}}
 
 5. Marquer une facture en relance :
 {"action":"relancer_facture","data":{"id":"uuid","message_coach":"texte"}}
 
-6. Corriger le statut d'un lead (ex: passer en converti) :
+6. Corriger le statut d'un lead :
 {"action":"update_lead","data":{"id":"uuid","statut":"contacté|qualifié|converti|perdu","score":"chaud|tiède|froid"}}
 
 ━━━ RÈGLES ━━━
 - Parle en français, chaleureux, direct, humain. Zéro jargon.
+- Si l'utilisateur a des RDV aujourd'hui, mentionne-les naturellement au début si pertinent
 - Interprète les chiffres avec empathie — ne les récite pas
 - Écoute D'ABORD si quelqu'un se sent mal
 - Célèbre les petites victoires
 - Quand tu vois des problèmes (leads non contactés, factures impayées, CA en chute), PROPOSE des actions concrètes
 - Si le CA baisse fort, propose de relancer les leads chauds
 - Si taux conversion < 10%, propose de revoir l'approche commerciale
-- Si objectif irréaliste (ex: doubler le CA en 1 mois), dis-le franchement et propose une correction
+- Si objectif irréaliste, dis-le franchement et propose une correction
 - Maximum 3-4 paragraphes. Percutant.
 - Tu es UN coach qui CONNAÎT ce client — pas un chatbot générique`
 
@@ -137,7 +160,6 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
       try {
         const action = JSON.parse(trimmed)
 
-        // ── Créer objectif ──────────────────────────────────────────────────
         if (action.action === 'create_objectif') {
           const { type, label, cible, periode } = action.data
           const { error } = await supabaseAdmin.from('objectifs').insert({
@@ -150,7 +172,6 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
           })
         }
 
-        // ── Modifier objectif ───────────────────────────────────────────────
         if (action.action === 'update_objectif') {
           const { id, label, cible, periode } = action.data
           await supabaseAdmin.from('objectifs').update({ label, cible, periode }).eq('id', id).eq('user_id', userId)
@@ -160,7 +181,6 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
           })
         }
 
-        // ── Supprimer objectif ──────────────────────────────────────────────
         if (action.action === 'delete_objectif') {
           await supabaseAdmin.from('objectifs').delete().eq('id', action.data.id).eq('user_id', userId)
           return NextResponse.json({
@@ -169,7 +189,6 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
           })
         }
 
-        // ── Relancer leads ──────────────────────────────────────────────────
         if (action.action === 'relancer_leads') {
           const { ids, message_coach } = action.data
           await supabaseAdmin.from('leads')
@@ -181,7 +200,6 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
           })
         }
 
-        // ── Relancer facture ────────────────────────────────────────────────
         if (action.action === 'relancer_facture') {
           await supabaseAdmin.from('factures').update({ statut: 'en retard' }).eq('id', action.data.id).eq('user_id', userId)
           return NextResponse.json({
@@ -190,7 +208,6 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
           })
         }
 
-        // ── Update lead ─────────────────────────────────────────────────────
         if (action.action === 'update_lead') {
           const { id, statut, score } = action.data
           await supabaseAdmin.from('leads').update({ statut, score }).eq('id', id).eq('user_id', userId)
@@ -200,9 +217,7 @@ Quand l'utilisateur confirme (dit "oui", "ok", "go", "valide", "c'est bon"), ré
           })
         }
 
-      } catch {
-        // Pas un JSON valide, réponse normale
-      }
+      } catch { /* Pas un JSON valide, réponse normale */ }
     }
 
     return NextResponse.json({ reply })
