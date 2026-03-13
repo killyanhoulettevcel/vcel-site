@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Package, TrendingUp, ShoppingCart, Plus, Pencil, Trash2, X, Check,
   RefreshCw, Download, Zap, AlertCircle, ExternalLink, BarChart2, ShoppingBag
@@ -50,19 +50,23 @@ export default function ProduitsPage() {
   const [loadP,    setLoadP]    = useState(true)
   const [loadV,    setLoadV]    = useState(true)
 
-  const refreshP = useCallback(async () => {
+  const refreshP = async () => {
     setLoadP(true)
     try { const r = await fetch('/api/produits'); if (r.ok) setProduits(await r.json()) } catch {}
     setLoadP(false)
-  }, [])
+  }
 
-  const refreshV = useCallback(async () => {
+  const refreshV = async () => {
     setLoadV(true)
     try { const r = await fetch('/api/ventes'); if (r.ok) setVentes(await r.json()) } catch {}
     setLoadV(false)
-  }, [])
+  }
 
-  useEffect(() => { refreshP(); refreshV() }, [refreshP, refreshV])
+  useEffect(() => {
+    refreshP()
+    refreshV()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [tab,          setTab]          = useState<Tab>('produits')
   const [showModal,    setShowModal]    = useState<'produit' | 'vente' | 'connecteur' | null>(null)
