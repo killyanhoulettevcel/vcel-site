@@ -1,6 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
-import { useRealtimeData } from '@/lib/useRealtimeData'
+import { useState, useCallback, useEffect } from 'react'
 import {
   Package, TrendingUp, ShoppingCart, Plus, Pencil, Trash2, X, Check,
   RefreshCw, Download, Zap, AlertCircle, ExternalLink, BarChart2, ShoppingBag
@@ -46,8 +45,24 @@ const emptyVente   = { produit_id: '', produit_nom: '', quantite: '1', prix_unit
 type Tab = 'produits' | 'ventes' | 'connecteurs'
 
 export default function ProduitsPage() {
-  const { data: produits, loading: loadP, refresh: refreshP } = useRealtimeData<Produit>('/api/produits', 'produits')
-  const { data: ventes,   loading: loadV, refresh: refreshV } = useRealtimeData<Vente>('/api/ventes',   'ventes')
+  const [produits, setProduits] = useState<Produit[]>([])
+  const [ventes,   setVentes]   = useState<Vente[]>([])
+  const [loadP,    setLoadP]    = useState(true)
+  const [loadV,    setLoadV]    = useState(true)
+
+  const refreshP = useCallback(async () => {
+    setLoadP(true)
+    try { const r = await fetch('/api/produits'); if (r.ok) setProduits(await r.json()) } catch {}
+    setLoadP(false)
+  }, [])
+
+  const refreshV = useCallback(async () => {
+    setLoadV(true)
+    try { const r = await fetch('/api/ventes'); if (r.ok) setVentes(await r.json()) } catch {}
+    setLoadV(false)
+  }, [])
+
+  useEffect(() => { refreshP(); refreshV() }, [refreshP, refreshV])
 
   const [tab,          setTab]          = useState<Tab>('produits')
   const [showModal,    setShowModal]    = useState<'produit' | 'vente' | 'connecteur' | null>(null)
