@@ -69,11 +69,11 @@ export default function Sidebar() {
         })}
       </nav>
       <div className="p-4 border-t border-white/5 space-y-1">
-        <a href="/dashboard/client/profil"
+        <a href="/dashboard/client/parametres"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-            pathname === '/dashboard/client/profil' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+            pathname === '/dashboard/client/parametres' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
           }`}>
-          <Settings size={16} /> Mon profil
+          <Settings size={16} /> Paramètres
         </a>
         <button onClick={() => signOut({ callbackUrl: '/' })}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-red-400 hover:bg-red-500/5 transition-all">
