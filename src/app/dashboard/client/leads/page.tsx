@@ -129,10 +129,10 @@ export default function LeadsPage() {
   const convertis = leads.filter(l => l.statut === 'converti').length
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">Leads CRM</h1>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Leads CRM</h1>
           <div className="flex items-center gap-3">
             <p className="text-white/40 text-sm">Créez, modifiez et suivez vos leads</p>
             {lastUpdate && (
