@@ -22,11 +22,11 @@ export default function CoachPage() {
   const { data: session } = useSession()
   const nom = session?.user?.name?.split(' ')[0] || 'toi'
 
-  const [messages, setMessages]         = useState<Message[]>([])
-  const [input, setInput]               = useState('')
-  const [loading, setLoading]           = useState(false)
+  const [messages, setMessages]           = useState<Message[]>([])
+  const [input, setInput]                 = useState('')
+  const [loading, setLoading]             = useState(false)
   const [dashboardData, setDashboardData] = useState<any>(null)
-  const [rdvCount, setRdvCount]         = useState(0)
+  const [rdvCount, setRdvCount]           = useState(0)
   const bottomRef   = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -36,21 +36,15 @@ export default function CoachPage() {
         try { const r = await fetch(url); return r.ok ? await r.json() : [] } catch { return [] }
       }
       const [ca, leads, factures, workflows, obj, prix, rdv, produits, ventes] = await Promise.all([
-        safe('/api/ca'),
-        safe('/api/leads'),
-        safe('/api/factures'),
-        safe('/api/workflows'),
-        safe('/api/objectifs'),
-        safe('/api/prix'),
-        safe('/api/calendar/today'),
-        safe('/api/produits'),
-        safe('/api/ventes'),
+        safe('/api/ca'), safe('/api/leads'), safe('/api/factures'),
+        safe('/api/workflows'), safe('/api/objectifs'), safe('/api/prix'),
+        safe('/api/calendar/today'), safe('/api/produits'), safe('/api/ventes'),
       ])
       setDashboardData({
         ca, leads, factures, workflows, produits, ventes,
-        objectifs:    obj?.objectifs || [],
-        scorePrix:    prix?.score_sante || null,
-        conseilPrix:  prix?.conseil_rapide || null,
+        objectifs: obj?.objectifs || [],
+        scorePrix: prix?.score_sante || null,
+        conseilPrix: prix?.conseil_rapide || null,
         rdvAujourdhui: Array.isArray(rdv) ? rdv : [],
       })
       setRdvCount(Array.isArray(rdv) ? rdv.length : 0)
@@ -63,11 +57,11 @@ export default function CoachPage() {
       const h = new Date().getHours()
       const salut = h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir'
       const rdvLine = rdvCount > 0
-        ? `\n\nJe vois que tu as **${rdvCount} RDV** aujourd'hui — on peut en parler si tu veux te préparer.`
+        ? `\n\nJe vois que tu as **${rdvCount} RDV** aujourd'hui.`
         : ''
       setMessages([{
         role: 'assistant',
-        content: `${salut} ${nom} 👋\n\nJe suis ton coach business personnel. Je connais tes chiffres, tes objectifs et ton agenda.${rdvLine}\n\nL'entrepreneuriat peut être solitaire. Ici, pas de jugement. Parle-moi de où tu en es, ce qui te pèse, ce qui te motive. Ou pose-moi simplement une question sur ton business.\n\nComment tu vas aujourd'hui ?`,
+        content: `${salut} ${nom} 👋\n\nJe suis ton coach business personnel. Je connais tes chiffres, tes objectifs et ton agenda.${rdvLine}\n\nComment tu vas aujourd'hui ?`,
         ts: new Date()
       }])
     }
@@ -80,51 +74,21 @@ export default function CoachPage() {
   const send = async (text?: string) => {
     const content = text || input.trim()
     if (!content || loading) return
-
     const userMsg: Message = { role: 'user', content, ts: new Date() }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
     setLoading(true)
-
     try {
-      const res = await fetch('/api/coach', {
+      const res  = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages:      newMessages.map(m => ({ role: m.role, content: m.content })),
-          dashboardData,
-          userName:      nom,
-        })
+        body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })), dashboardData, userName: nom })
       })
       const data = await res.json()
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.reply || data.error || 'Erreur de connexion',
-        ts: new Date()
-      }])
-      if (data.action) {
-        const safe = async (url: string) => { try { const r = await fetch(url); return r.ok ? await r.json() : null } catch { return null } }
-        if (['objectif_created','objectif_updated','objectif_deleted'].includes(data.action)) {
-          const obj = await safe('/api/objectifs')
-          if (obj) setDashboardData((prev: any) => ({ ...prev, objectifs: obj?.objectifs || [] }))
-        }
-        if (['leads_relanced','lead_updated'].includes(data.action)) {
-          const leads = await safe('/api/leads')
-          if (leads) setDashboardData((prev: any) => ({ ...prev, leads: leads || [] }))
-        }
-        if (data.action === 'facture_relanced') {
-          const factures = await safe('/api/factures')
-          if (factures) setDashboardData((prev: any) => ({ ...prev, factures: factures || [] }))
-        }
-        window.dispatchEvent(new CustomEvent('coach:action', { detail: { action: data.action } }))
-      }
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.error || 'Erreur', ts: new Date() }])
     } catch {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Désolé, je n\'arrive pas à me connecter. Vérifie ta clé OPENAI_API_KEY.',
-        ts: new Date()
-      }])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Désolé, erreur de connexion.', ts: new Date() }])
     }
     setLoading(false)
   }
@@ -134,62 +98,64 @@ export default function CoachPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)]">
       {/* Header */}
-      <div className="px-8 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
+      <div className="px-4 md:px-8 py-4 md:py-5 border-b border-white/5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center">
-            <Brain size={18} className="text-purple-400" />
+          <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center">
+            <Brain size={16} className="text-purple-400" />
           </div>
           <div>
             <h1 className="font-display font-bold text-white text-sm">Coach IA</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <p className="text-white/30 text-xs">Disponible 24h/24 · GPT-4o mini</p>
+              <p className="text-white/30 text-xs hidden sm:block">Disponible 24h/24 · GPT-4o mini</p>
+              <p className="text-white/30 text-xs sm:hidden">En ligne</p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {rdvCount > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs">
+            <div className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs">
               <Calendar size={12} />
-              {rdvCount} RDV aujourd'hui
+              <span className="hidden sm:inline">{rdvCount} RDV aujourd'hui</span>
+              <span className="sm:hidden">{rdvCount} RDV</span>
             </div>
           )}
-          <button onClick={() => setMessages([])} className="btn-ghost text-xs py-2 px-3 gap-1.5">
-            <RefreshCw size={12} /> Nouvelle conversation
+          <button onClick={() => setMessages([])} className="btn-ghost text-xs py-2 px-2 md:px-3 gap-1.5">
+            <RefreshCw size={12} />
+            <span className="hidden sm:inline">Nouvelle conversation</span>
           </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 md:py-6 space-y-4 md:space-y-6">
         {messages.map((m, i) => (
-          <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={i} className={`flex gap-2 md:gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {m.role === 'assistant' && (
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkles size={13} className="text-purple-400" />
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles size={12} className="text-purple-400" />
               </div>
             )}
-            <div className={`max-w-lg ${m.role === 'user' ? 'order-first' : ''}`}>
-              <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+            <div className={`max-w-[85%] md:max-w-lg ${m.role === 'user' ? 'order-first' : ''}`}>
+              <div className={`rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                 m.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-sm ml-12'
+                  ? 'bg-blue-500 text-white rounded-br-sm ml-8 md:ml-12'
                   : 'bg-white/5 border border-white/8 text-white/85 rounded-bl-sm'
               }`}>
                 {m.content}
               </div>
-              <p className={`text-white/20 text-xs mt-1.5 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+              <p className={`text-white/20 text-xs mt-1 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
                 {m.ts.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
           </div>
         ))}
-
         {loading && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center shrink-0">
-              <Sparkles size={13} className="text-purple-400" />
+          <div className="flex gap-2 md:gap-3 justify-start">
+            <div className="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center shrink-0">
+              <Sparkles size={12} className="text-purple-400" />
             </div>
             <div className="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3">
               <div className="flex items-center gap-1.5">
@@ -205,11 +171,11 @@ export default function CoachPage() {
 
       {/* Suggestions */}
       {messages.length <= 1 && (
-        <div className="px-8 pb-4 shrink-0">
+        <div className="px-4 md:px-8 pb-3 shrink-0">
           <div className="flex flex-wrap gap-2">
             {suggestions.map(s => (
               <button key={s} onClick={() => send(s)}
-                className="text-xs px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all">
+                className="text-xs px-3 py-1.5 md:py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">
                 {s}
               </button>
             ))}
@@ -218,28 +184,26 @@ export default function CoachPage() {
       )}
 
       {/* Input */}
-      <div className="px-8 pb-6 shrink-0">
-        <div className="flex items-end gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus-within:border-blue-500/40 transition-colors">
+      <div className="px-4 md:px-8 pb-4 md:pb-6 shrink-0">
+        <div className="flex items-end gap-2 md:gap-3 bg-white/5 border border-white/10 rounded-2xl px-3 md:px-4 py-2.5 md:py-3 focus-within:border-blue-500/40 transition-colors">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Écris ici... (Entrée pour envoyer)"
+            placeholder="Écris ici..."
             rows={1}
             className="flex-1 bg-transparent text-white text-sm placeholder:text-white/20 focus:outline-none resize-none max-h-32"
             style={{ fieldSizing: 'content' } as any}
           />
           <button onClick={() => send()} disabled={!input.trim() || loading}
             className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-              input.trim() && !loading
-                ? 'bg-blue-500 text-white hover:bg-blue-400'
-                : 'bg-white/5 text-white/20 cursor-not-allowed'
+              input.trim() && !loading ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-white/5 text-white/20 cursor-not-allowed'
             }`}>
             <Send size={14} />
           </button>
         </div>
-        <p className="text-white/15 text-xs text-center mt-2">Shift+Entrée pour saut de ligne</p>
+        <p className="text-white/15 text-xs text-center mt-1.5 hidden md:block">Shift+Entrée pour saut de ligne</p>
       </div>
     </div>
   )
