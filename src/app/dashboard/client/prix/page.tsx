@@ -57,10 +57,10 @@ export default function PrixPage() {
   const scoreBg    = (s: number) => s >= 70 ? 'bg-green-400'   : s >= 40 ? 'bg-orange-400'   : 'bg-red-400'
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">Suggestions de prix</h1>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Suggestions de prix</h1>
           <p className="text-white/40 text-sm">Analyse IA basée sur tes vrais produits et marges</p>
         </div>
         <div className="flex items-center gap-3">
@@ -90,7 +90,7 @@ export default function PrixPage() {
       ) : data ? (
         <div className="space-y-5">
           {/* Score + stats */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             <div className="card-glass p-5 col-span-1">
               <p className="text-white/40 text-xs mb-2">Score tarifaire</p>
               <p className={`font-display text-4xl font-bold ${scoreColor(data.score_sante)}`}>
