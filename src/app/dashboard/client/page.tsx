@@ -1,7 +1,7 @@
 'use client'
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Users, FileText, Zap, AlertCircle, ArrowUpRight, ShoppingBag, Package } from 'lucide-react'
+import { TrendingUp, TrendingDown, Users, FileText, AlertCircle, ArrowUpRight, ShoppingBag, Package, Zap, BarChart2 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar
@@ -10,10 +10,10 @@ import {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="card-glass px-3 py-2 text-xs">
-      <p className="text-white/50 mb-1">{label}</p>
+    <div className="bg-white border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs shadow-lg-navy">
+      <p className="text-[var(--text-muted)] mb-1.5 font-medium">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color }} className="font-semibold">
+        <p key={p.name} className="font-semibold" style={{ color: p.color }}>
           {p.name === 'ca_ht' ? 'CA' : p.name === 'charges' ? 'Charges' : p.name === 'ventes' ? 'Ventes' : p.name} : {p.value}{p.name !== 'leads' ? '€' : ''}
         </p>
       ))}
@@ -35,7 +35,7 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     const safeFetch = async (url: string) => {
-      try { const r = await fetch(url); return r.ok ? await r.json().then(d => Array.isArray(d) ? d : []) : [] } catch { return [] }
+      try { const r = await fetch(url); return r.ok ? await r.json().then((d: any) => Array.isArray(d) ? d : []) : [] } catch { return [] }
     }
     Promise.all([
       safeFetch('/api/ca'), safeFetch('/api/leads'), safeFetch('/api/factures'),
@@ -54,27 +54,27 @@ export default function ClientDashboard() {
 
   const now        = new Date()
   const moisActuel = now.toISOString().slice(0, 7)
-  const leadsCeMois    = leads.filter(l => l.date?.startsWith(moisActuel)).length
-  const impayees       = factures.filter(f => f.statut !== 'payée')
-  const montantDu      = impayees.reduce((s, f) => s + (f.montant_ttc || 0), 0)
-  const ventesCeMois   = ventes.filter(v => v.date_vente?.startsWith(moisActuel))
-  const caVentesCeMois = ventesCeMois.reduce((s, v) => s + (v.total || 0), 0)
+  const impayees       = factures.filter((f: any) => f.statut !== 'payée')
+  const montantDu      = impayees.reduce((s: number, f: any) => s + (f.montant_ttc || 0), 0)
+  const leadsCeMois    = leads.filter((l: any) => l.date?.startsWith(moisActuel)).length
+  const ventesCeMois   = ventes.filter((v: any) => v.date_vente?.startsWith(moisActuel))
+  const caVentesCeMois = ventesCeMois.reduce((s: number, v: any) => s + (v.total || 0), 0)
   const nbVentesCeMois = ventesCeMois.length
 
-  const bestSellers = [...produits].sort((a, b) => {
-    const va = ventes.filter(v => v.produit_id === a.id).reduce((s, v) => s + v.quantite, 0)
-    const vb = ventes.filter(v => v.produit_id === b.id).reduce((s, v) => s + v.quantite, 0)
+  const bestSellers = [...produits].sort((a: any, b: any) => {
+    const va = ventes.filter((v: any) => v.produit_id === a.id).reduce((s: number, v: any) => s + v.quantite, 0)
+    const vb = ventes.filter((v: any) => v.produit_id === b.id).reduce((s: number, v: any) => s + v.quantite, 0)
     return vb - va
   }).slice(0, 3)
 
-  const caChartData = caData.map(m => {
-    const ventesMonth = ventes.filter(v => v.date_vente?.slice(0, 7) === m.mois?.slice(0, 7)).reduce((s, v) => s + (v.total || 0), 0)
+  const caChartData = caData.map((m: any) => {
+    const ventesMonth = ventes.filter((v: any) => v.date_vente?.slice(0, 7) === m.mois?.slice(0, 7)).reduce((s: number, v: any) => s + (v.total || 0), 0)
     return { ...m, ventes: Math.round(ventesMonth) }
   })
 
   const joursNoms = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
   const leadsParJour = joursNoms.map(jour => ({ jour, leads: 0 }))
-  leads.forEach(l => {
+  leads.forEach((l: any) => {
     if (!l.date) return
     const d = new Date(l.date)
     const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
@@ -83,16 +83,41 @@ export default function ClientDashboard() {
   const leadsData = [...leadsParJour.slice(1), leadsParJour[0]]
 
   const kpis = [
-    { label: 'CA ce mois',        value: dernierMois ? `${(dernierMois.ca_ht || 0).toLocaleString('fr-FR')}€` : '—', sub: diffCA !== null ? `${diffCA >= 0 ? '+' : ''}${diffCA}% vs mois dernier` : 'Pas de données', trend: diffCA === null ? 'warn' : diffCA >= 0 ? 'up' : 'down', icon: TrendingUp },
-    { label: 'Ventes ce mois',    value: `${caVentesCeMois.toLocaleString('fr-FR')}€`, sub: `${nbVentesCeMois} vente${nbVentesCeMois > 1 ? 's' : ''} · ${produits.length} produits`, trend: nbVentesCeMois > 0 ? 'up' : 'warn', icon: ShoppingBag },
-    { label: 'Leads ce mois',     value: String(leadsCeMois), sub: `${leads.length} leads au total`, trend: 'up', icon: Users },
-    { label: 'Factures impayées', value: String(impayees.length), sub: impayees.length > 0 ? `${montantDu.toLocaleString('fr-FR')}€ en attente` : 'Tout est à jour ✓', trend: impayees.length > 0 ? 'warn' : 'up', icon: FileText },
+    {
+      label: 'CA ce mois',
+      value: dernierMois ? `${(dernierMois.ca_ht || 0).toLocaleString('fr-FR')}€` : '—',
+      sub: diffCA !== null ? `${diffCA >= 0 ? '+' : ''}${diffCA}% vs mois dernier` : 'Aucune donnée',
+      trend: diffCA === null ? 'neutral' : diffCA >= 0 ? 'up' : 'down',
+      icon: TrendingUp, color: 'text-cyan-600', bg: 'bg-cyan-50 border-cyan-100',
+    },
+    {
+      label: 'Ventes ce mois',
+      value: `${caVentesCeMois.toLocaleString('fr-FR')}€`,
+      sub: `${nbVentesCeMois} vente${nbVentesCeMois > 1 ? 's' : ''} · ${produits.length} produits`,
+      trend: nbVentesCeMois > 0 ? 'up' : 'neutral',
+      icon: ShoppingBag, color: 'text-navy-700', bg: 'bg-navy-50 border-navy-100',
+    },
+    {
+      label: 'Leads ce mois',
+      value: String(leadsCeMois),
+      sub: `${leads.length} leads au total`,
+      trend: 'up',
+      icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100',
+    },
+    {
+      label: 'Factures impayées',
+      value: String(impayees.length),
+      sub: impayees.length > 0 ? `${montantDu.toLocaleString('fr-FR')}€ en attente` : 'Tout est à jour ✓',
+      trend: impayees.length > 0 ? 'warn' : 'up',
+      icon: FileText, color: impayees.length > 0 ? 'text-orange-500' : 'text-emerald-600',
+      bg: impayees.length > 0 ? 'bg-orange-50 border-orange-100' : 'bg-emerald-50 border-emerald-100',
+    },
   ]
 
   if (loading) return (
     <div className="p-6 flex items-center justify-center h-96">
-      <div className="flex items-center gap-3 text-white/30">
-        <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+      <div className="flex items-center gap-3 text-[var(--text-muted)]">
+        <div className="w-5 h-5 border-2 border-[var(--border-hover)] border-t-navy-700 rounded-full animate-spin" />
         Chargement...
       </div>
     </div>
@@ -100,24 +125,30 @@ export default function ClientDashboard() {
 
   return (
     <div className="p-4 md:p-8">
+      {/* Header */}
       <div className="mb-6 md:mb-8">
-        <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Bonjour {nom} 👋</h1>
-        <p className="text-white/40 text-xs md:text-sm">Voici votre tableau de bord — données en temps réel</p>
+        <h1 className="font-display text-2xl md:text-3xl text-[var(--navy)] mb-1">
+          Bonjour {nom} 👋
+        </h1>
+        <p className="text-[var(--text-muted)] text-sm">Tableau de bord — données en temps réel</p>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         {kpis.map((k) => (
-          <div key={k.label} className="card-glass p-4 md:p-5">
-            <div className="flex items-start justify-between mb-2 md:mb-3">
-              <p className="text-white/40 text-xs font-medium leading-tight">{k.label}</p>
-              <div className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center shrink-0 ${k.trend === 'up' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
-                <k.icon size={12} className={k.trend === 'up' ? 'text-green-400' : 'text-orange-400'} />
+          <div key={k.label} className="kpi-card">
+            <div className="flex items-start justify-between mb-3">
+              <p className="text-[var(--text-muted)] text-xs font-medium">{k.label}</p>
+              <div className={`w-8 h-8 rounded-xl border flex items-center justify-center ${k.bg}`}>
+                <k.icon size={14} className={k.color} />
               </div>
             </div>
-            <p className="font-display text-xl md:text-2xl font-bold text-white mb-1">{k.value}</p>
-            <p className={`text-xs flex items-center gap-1 ${k.trend === 'up' ? 'text-green-400' : 'text-orange-400'}`}>
-              {k.trend === 'up' ? <TrendingUp size={10} /> : <AlertCircle size={10} />}
+            <p className="font-display text-2xl text-[var(--navy)] mb-1">{k.value}</p>
+            <p className={`text-xs flex items-center gap-1 ${
+              k.trend === 'up' ? 'text-emerald-600' :
+              k.trend === 'warn' ? 'text-orange-500' : 'text-[var(--text-muted)]'
+            }`}>
+              {k.trend === 'up' ? <TrendingUp size={10} /> : k.trend === 'down' ? <TrendingDown size={10} /> : <AlertCircle size={10} />}
               <span className="truncate">{k.sub}</span>
             </p>
           </div>
@@ -126,66 +157,66 @@ export default function ClientDashboard() {
 
       {/* Charts */}
       <div className="grid lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-        <div className="lg:col-span-2 card-glass p-4 md:p-6">
-          <div className="flex items-center justify-between mb-4 md:mb-6">
+        <div className="lg:col-span-2 card-glass p-5 md:p-6">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="font-display font-semibold text-white text-sm">Évolution CA & Ventes</h2>
-              <p className="text-white/30 text-xs">{caData.length} mois de données</p>
+              <h2 className="font-semibold text-[var(--navy)] text-sm">Évolution CA & Ventes</h2>
+              <p className="text-[var(--text-muted)] text-xs">{caData.length} mois de données</p>
             </div>
-            <a href="/dashboard/client/finances" className="text-xs text-blue-400 flex items-center gap-1">
+            <a href="/dashboard/client/finances" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1 font-medium">
               Détail <ArrowUpRight size={12} />
             </a>
           </div>
           {caData.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-white/20 text-xs text-center px-4">
-              Aucune donnée CA — ajoutez des mois dans Finances
+            <div className="h-40 flex items-center justify-center text-[var(--text-light)] text-sm">
+              Aucune donnée — ajoutez des mois dans Finances
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={caChartData}>
                 <defs>
                   <linearGradient id="caGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="chargesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#0D1B2A" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#0D1B2A" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="ventesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#4FC3F7" stopOpacity={0.20} />
+                    <stop offset="95%" stopColor="#4FC3F7" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="chargesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#E65100" stopOpacity={0.10} />
+                    <stop offset="95%" stopColor="#E65100" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="mois" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={45} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="mois" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={45} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="ca_ht"   stroke="#3B82F6" strokeWidth={2} fill="url(#caGrad)" />
-                <Area type="monotone" dataKey="charges" stroke="#6366f1" strokeWidth={2} fill="url(#chargesGrad)" />
-                <Area type="monotone" dataKey="ventes"  stroke="#10b981" strokeWidth={2} fill="url(#ventesGrad)" />
+                <Area type="monotone" dataKey="ca_ht"   stroke="#0D1B2A" strokeWidth={2} fill="url(#caGrad)" />
+                <Area type="monotone" dataKey="ventes"  stroke="#0288D1" strokeWidth={2} fill="url(#ventesGrad)" />
+                <Area type="monotone" dataKey="charges" stroke="#E65100" strokeWidth={1.5} fill="url(#chargesGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="card-glass p-4 md:p-6">
-          <div className="flex items-center justify-between mb-4 md:mb-6">
+        <div className="card-glass p-5 md:p-6">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="font-display font-semibold text-white text-sm">Leads / jour</h2>
-              <p className="text-white/30 text-xs">Cette semaine</p>
+              <h2 className="font-semibold text-[var(--navy)] text-sm">Leads / jour</h2>
+              <p className="text-[var(--text-muted)] text-xs">Cette semaine</p>
             </div>
-            <a href="/dashboard/client/leads" className="text-xs text-blue-400 flex items-center gap-1">
+            <a href="/dashboard/client/leads" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1 font-medium">
               CRM <ArrowUpRight size={12} />
             </a>
           </div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={leadsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="jour" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="jour" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="leads" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="leads" fill="#0D1B2A" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -193,32 +224,34 @@ export default function ClientDashboard() {
 
       {/* Best-sellers + Workflows */}
       <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-        <div className="card-glass p-4 md:p-6">
-          <div className="flex items-center justify-between mb-4 md:mb-5">
-            <h2 className="font-display font-semibold text-white text-sm">🏆 Best-sellers</h2>
-            <a href="/dashboard/client/produits" className="text-xs text-blue-400 flex items-center gap-1">Produits <ArrowUpRight size={12} /></a>
+        <div className="card-glass p-5 md:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-[var(--navy)] text-sm">🏆 Best-sellers</h2>
+            <a href="/dashboard/client/produits" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1 font-medium">
+              Produits <ArrowUpRight size={12} />
+            </a>
           </div>
           {bestSellers.length === 0 ? (
             <div className="text-center py-6">
-              <Package size={24} className="text-white/10 mx-auto mb-2" />
-              <p className="text-white/20 text-xs">Aucun produit</p>
+              <Package size={24} className="text-[var(--text-light)] mx-auto mb-2" />
+              <p className="text-[var(--text-muted)] text-xs">Aucun produit</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {bestSellers.map((p, i) => {
-                const qty = ventes.filter(v => v.produit_id === p.id).reduce((s, v) => s + v.quantite, 0)
-                const ca  = ventes.filter(v => v.produit_id === p.id).reduce((s, v) => s + (v.total || 0), 0)
+              {bestSellers.map((p: any, i: number) => {
+                const qty = ventes.filter((v: any) => v.produit_id === p.id).reduce((s: number, v: any) => s + v.quantite, 0)
+                const ca  = ventes.filter((v: any) => v.produit_id === p.id).reduce((s: number, v: any) => s + (v.total || 0), 0)
                 const medals = ['🥇','🥈','🥉']
                 return (
-                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                      <span className="text-base md:text-lg shrink-0">{medals[i]}</span>
+                  <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-[var(--border)] last:border-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">{medals[i]}</span>
                       <div className="min-w-0">
-                        <p className="text-white text-xs font-medium truncate">{p.nom}</p>
-                        <p className="text-white/30 text-xs">{qty} ventes · {p.taux_marge}%</p>
+                        <p className="text-[var(--text-primary)] text-xs font-semibold truncate">{p.nom}</p>
+                        <p className="text-[var(--text-muted)] text-xs">{qty} ventes · {p.taux_marge}% marge</p>
                       </div>
                     </div>
-                    <span className="text-green-400 text-xs font-semibold shrink-0">{ca.toLocaleString('fr-FR')}€</span>
+                    <span className="text-emerald-600 text-xs font-bold shrink-0">{ca.toLocaleString('fr-FR')}€</span>
                   </div>
                 )
               })}
@@ -226,27 +259,26 @@ export default function ClientDashboard() {
           )}
         </div>
 
-        <div className="card-glass p-4 md:p-6">
-          <div className="flex items-center justify-between mb-4 md:mb-5">
-            <h2 className="font-display font-semibold text-white text-sm">Statut workflows</h2>
-            <a href="/dashboard/client/workflows" className="text-xs text-blue-400 flex items-center gap-1">Gérer <ArrowUpRight size={12} /></a>
+        <div className="card-glass p-5 md:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-[var(--navy)] text-sm">Workflows</h2>
+            <a href="/dashboard/client/workflows" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1 font-medium">
+              Gérer <ArrowUpRight size={12} />
+            </a>
           </div>
           {workflows.length === 0 ? (
-            <p className="text-white/20 text-sm text-center py-6">Aucun workflow configuré</p>
+            <p className="text-[var(--text-muted)] text-sm text-center py-6">Aucun workflow configuré</p>
           ) : (
             <div className="space-y-2">
-              {workflows.slice(0, 5).map((w) => (
-                <div key={w.id || w.nom} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
-                  <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${w.statut === 'ok' ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`} />
-                    <span className="text-white/70 text-xs md:text-sm truncate">{w.nom}</span>
+              {workflows.slice(0, 5).map((w: any) => (
+                <div key={w.id || w.nom} className="flex items-center justify-between py-2.5 border-b border-[var(--border)] last:border-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${w.statut === 'ok' ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} />
+                    <span className="text-[var(--text-secondary)] text-xs font-medium truncate">{w.nom}</span>
                   </div>
-                  <div className="flex items-center gap-2 md:gap-4 text-xs text-white/30 shrink-0">
-                    <span className="hidden md:block">{w.nb_executions_mois || 0} exec.</span>
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${w.statut === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                      {w.statut === 'ok' ? '✓' : '✗'}
-                    </span>
-                  </div>
+                  <span className={`badge text-xs ${w.statut === 'ok' ? 'badge-green' : 'badge-red'}`}>
+                    {w.statut === 'ok' ? '✓ Actif' : '✗ Erreur'}
+                  </span>
                 </div>
               ))}
             </div>
