@@ -39,9 +39,9 @@ const types = [
 
 export default function ImportPage() {
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-white mb-1">Importer des données</h1>
+        <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Importer des données</h1>
         <p className="text-white/40 text-sm">Glissez n'importe quel CSV — le type est détecté automatiquement et les données sont synchronisées dans Supabase et votre Google Sheet</p>
       </div>
 
