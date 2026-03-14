@@ -2,23 +2,28 @@
 import { SessionProvider, useSession } from 'next-auth/react'
 import Sidebar from '@/components/dashboard/Sidebar'
 import Notifications from '@/components/dashboard/Notifications'
+import { Bell, Settings } from 'lucide-react'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
+  const nom = session?.user?.name || session?.user?.email || '?'
+
   return (
-    <div className="flex min-h-screen bg-navy-950">
+    <div className="flex min-h-screen bg-cream-100">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-auto min-w-0">
         {/* Topbar desktop */}
-        <div className="hidden lg:flex h-14 border-b border-white/5 px-6 items-center justify-end gap-3 shrink-0">
+        <div className="hidden lg:flex h-14 topbar px-6 items-center justify-end gap-3 shrink-0">
           <Notifications />
-          <div className="w-px h-5 bg-white/10" />
+          <div className="w-px h-5 bg-[var(--border)]" />
           <a href="/dashboard/client/parametres"
-            className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-sm font-bold hover:bg-blue-500/30 transition-all">
-            {(session?.user?.name || session?.user?.email || '?').charAt(0).toUpperCase()}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[var(--bg-secondary)] transition-colors">
+            <div className="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center text-white text-xs font-bold">
+              {nom.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-xs font-medium text-[var(--text-secondary)]">{nom.split(' ')[0]}</span>
           </a>
         </div>
-        {/* Padding-top mobile pour la topbar hamburger */}
         <main className="flex-1 overflow-auto pt-14 lg:pt-0">
           {children}
         </main>
