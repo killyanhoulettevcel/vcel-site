@@ -138,9 +138,9 @@ export default function ParametresPage() {
   )
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-white mb-1">Paramètres</h1>
+        <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Paramètres</h1>
         <p className="text-white/40 text-sm">Gérez votre compte, intégrations et préférences</p>
       </div>
 
