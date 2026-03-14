@@ -95,10 +95,10 @@ export default function ObjectifsPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">Objectifs & KPIs</h1>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Objectifs & KPIs</h1>
           <p className="text-white/40 text-sm">Fixe des cibles et suis ta progression en temps réel</p>
         </div>
         <div className="flex items-center gap-2">
@@ -113,7 +113,7 @@ export default function ObjectifsPage() {
 
       {/* Stats réelles */}
       {data?.reels && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5 md:mb-6">
           {[
             { label: 'CA ce mois',      value: `${data.reels.caMois.toLocaleString('fr-FR')}€`,        icon: TrendingUp,  color: 'text-blue-400' },
             { label: 'Ventes ce mois',  value: `${data.reels.caVentesMois.toLocaleString('fr-FR')}€`,  icon: ShoppingBag, color: 'text-green-400' },
