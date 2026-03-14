@@ -183,10 +183,10 @@ export default function ProduitsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">Produits & Ventes</h1>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Produits & Ventes</h1>
           <p className="text-white/40 text-sm">Shopify · WooCommerce · Stripe · Manuel</p>
         </div>
         <div className="flex items-center gap-2">
@@ -278,7 +278,7 @@ export default function ProduitsPage() {
             <div className="flex justify-end mb-4">
               <button onClick={() => exportCSV(produits, 'produits')} className="btn-ghost text-xs py-2 px-3 gap-1.5"><Download size={12} /> Exporter</button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/5">
@@ -341,7 +341,7 @@ export default function ProduitsPage() {
             <div className="flex justify-end mb-4">
               <button onClick={() => exportCSV(ventes, 'ventes')} className="btn-ghost text-xs py-2 px-3 gap-1.5"><Download size={12} /> Exporter</button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/5">
