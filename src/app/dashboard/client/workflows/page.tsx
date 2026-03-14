@@ -50,44 +50,31 @@ export default function WorkflowsPage() {
 
   useEffect(() => {
     fetchWorkflows()
-
-    // Real time Supabase — écoute les changements sur la table workflows
     const channel = supabase
       .channel('workflows-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'workflows' },
-        (payload) => {
-          // Mettre à jour le workflow modifié sans refetch complet
-          if (payload.eventType === 'UPDATE') {
-            setWorkflows(prev => prev.map(w =>
-              w.id === (payload.new as any).id ? { ...w, ...(payload.new as any) } : w
-            ))
-            setLastUpdate(new Date())
-          } else {
-            // INSERT ou DELETE → refetch complet
-            fetchWorkflows()
-          }
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflows' }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          setWorkflows(prev => prev.map(w => w.id === (payload.new as any).id ? { ...w, ...(payload.new as any) } : w))
+          setLastUpdate(new Date())
+        } else { fetchWorkflows() }
+      })
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
   }, [])
 
   const refresh = () => { setRefreshing(true); fetchWorkflows() }
-
   const actifs  = workflows.filter(w => w.statut === 'ok').length
   const erreurs = workflows.filter(w => w.statut === 'erreur').length
   const totalEx = workflows.reduce((s, w) => s + (w.nb_executions_mois || 0), 0)
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 md:p-8">
+      {/* Header */}
+      <div className="mb-6 md:mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">Workflows</h1>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Workflows</h1>
           <div className="flex items-center gap-3">
-            <p className="text-white/40 text-sm">Vos automatisations n8n actives</p>
+            <p className="text-white/40 text-xs md:text-sm">Vos automatisations n8n actives</p>
             {lastUpdate && (
               <span className="flex items-center gap-1.5 text-xs text-green-400/60">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -96,28 +83,28 @@ export default function WorkflowsPage() {
             )}
           </div>
         </div>
-        <button onClick={refresh}
-          className="btn-ghost text-sm py-2 px-4 flex items-center gap-2">
+        <button onClick={refresh} className="btn-ghost text-sm py-2 px-3 md:px-4 flex items-center gap-2">
           <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-          Actualiser
+          <span className="hidden sm:inline">Actualiser</span>
         </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="card-glass p-5">
+      <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+        <div className="card-glass p-4 md:p-5">
           <p className="text-white/40 text-xs mb-2">Actifs</p>
-          <p className="font-display text-3xl font-bold text-white">
-            {actifs}<span className="text-white/20 text-lg font-normal">/{workflows.length}</span>
+          <p className="font-display text-2xl md:text-3xl font-bold text-white">
+            {actifs}<span className="text-white/20 text-sm md:text-lg font-normal">/{workflows.length}</span>
           </p>
         </div>
-        <div className="card-glass p-5">
+        <div className="card-glass p-4 md:p-5">
           <p className="text-white/40 text-xs mb-2">Erreurs</p>
-          <p className={`font-display text-3xl font-bold ${erreurs > 0 ? 'text-red-400' : 'text-white'}`}>{erreurs}</p>
+          <p className={`font-display text-2xl md:text-3xl font-bold ${erreurs > 0 ? 'text-red-400' : 'text-white'}`}>{erreurs}</p>
         </div>
-        <div className="card-glass p-5">
-          <p className="text-white/40 text-xs mb-2">Exécutions ce mois</p>
-          <p className="font-display text-3xl font-bold text-white">{totalEx}</p>
+        <div className="card-glass p-4 md:p-5">
+          <p className="text-white/40 text-xs mb-1">Exécutions</p>
+          <p className="text-white/30 text-xs mb-1 hidden md:block">ce mois</p>
+          <p className="font-display text-2xl md:text-3xl font-bold text-white">{totalEx}</p>
         </div>
       </div>
 
@@ -140,7 +127,7 @@ export default function WorkflowsPage() {
         <div className="card-glass p-12 text-center">
           <Zap size={32} className="text-white/10 mx-auto mb-3" />
           <p className="text-white/30 text-sm">Aucun workflow configuré</p>
-          <p className="text-white/20 text-xs mt-1">Vos workflows apparaîtront ici après la configuration de votre compte</p>
+          <p className="text-white/20 text-xs mt-1">Vos workflows apparaîtront ici après la configuration</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -149,16 +136,14 @@ export default function WorkflowsPage() {
             const Icon = workflowIcons[w.nom] || Zap
             const isOk = w.statut === 'ok'
             return (
-              <div key={w.id} className={`card-glass p-5 transition-all ${w.statut === 'erreur' ? 'border-red-500/20' : ''}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      isOk ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-white/5 border border-white/10'
-                    }`}>
-                      <Icon size={18} className={isOk ? 'text-blue-400' : 'text-white/20'} />
+              <div key={w.id} className={`card-glass p-4 md:p-5 transition-all ${w.statut === 'erreur' ? 'border-red-500/20' : ''}`}>
+                <div className="flex items-start justify-between gap-3 md:gap-4">
+                  <div className="flex items-start gap-3 md:gap-4 min-w-0">
+                    <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center shrink-0 ${isOk ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-white/5 border border-white/10'}`}>
+                      <Icon size={16} className={isOk ? 'text-blue-400' : 'text-white/20'} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="text-white text-sm font-medium">{w.nom}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium flex items-center gap-1 ${s.color}`}>
                           <div className={`w-1.5 h-1.5 rounded-full ${s.dot} ${w.statut === 'erreur' ? 'animate-pulse' : ''}`} />
@@ -170,10 +155,10 @@ export default function WorkflowsPage() {
                           <XCircle size={11} /> {w.erreur_message}
                         </p>
                       )}
-                      <div className="flex items-center gap-4 text-xs text-white/25">
+                      <div className="flex items-center gap-3 md:gap-4 text-xs text-white/25 flex-wrap">
                         <span>{w.nb_executions_mois || 0} exécutions ce mois</span>
                         {w.derniere_execution && (
-                          <span>Dernière : {new Date(w.derniere_execution).toLocaleDateString('fr-FR')}</span>
+                          <span className="hidden md:inline">Dernière : {new Date(w.derniere_execution).toLocaleDateString('fr-FR')}</span>
                         )}
                       </div>
                     </div>
@@ -186,7 +171,7 @@ export default function WorkflowsPage() {
         </div>
       )}
 
-      <div className="card-glass p-5 mt-6 flex items-start gap-3">
+      <div className="card-glass p-4 md:p-5 mt-5 md:mt-6 flex items-start gap-3">
         <Zap size={15} className="text-blue-400 shrink-0 mt-0.5" />
         <div>
           <p className="text-white text-sm font-medium mb-0.5">Vos workflows tournent automatiquement</p>
