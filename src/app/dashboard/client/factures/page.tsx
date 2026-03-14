@@ -123,10 +123,10 @@ export default function FacturesPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">Factures</h1>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Factures</h1>
           <div className="flex items-center gap-3">
             <p className="text-white/40 text-sm">Synchronisé avec Stripe en temps réel</p>
             {lastUpdate && (
@@ -191,7 +191,7 @@ export default function FacturesPage() {
         </div>
       ) : (
         <div className="card-glass p-6">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-1">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/5">
