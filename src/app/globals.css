@@ -282,3 +282,61 @@ input, textarea, select {
   text-transform: uppercase;
   color: var(--text-light);
 }
+
+
+/* ── Compatibilité thème sombre → clair ────────────────────────────────────── */
+/* Les anciennes pages utilisent text-white, bg-white/5 etc — on les remappe */
+
+.text-white         { color: var(--navy) !important; }
+.text-white\/40    { color: var(--text-muted) !important; }
+.text-white\/50    { color: var(--text-secondary) !important; }
+.text-white\/60    { color: var(--text-secondary) !important; }
+.text-white\/70    { color: var(--text-primary) !important; }
+.text-white\/30    { color: var(--text-light) !important; }
+.text-white\/20    { color: var(--text-light) !important; }
+.text-white\/15    { color: var(--text-light) !important; }
+.text-white\/10    { color: rgba(13,27,42,0.15) !important; }
+
+/* Fonds sombres → blanc */
+.bg-navy-900        { background-color: white !important; }
+.bg-navy-950        { background-color: var(--bg) !important; }
+.bg-\[#080c14\]   { background-color: var(--bg) !important; }
+.bg-\[#0d1321\]   { background-color: white !important; }
+
+/* Cartes sombres */
+.bg-white\/5       { background-color: var(--bg-secondary) !important; }
+.bg-white\/3       { background-color: rgba(255,255,255,0.8) !important; }
+.bg-white\/8       { background-color: rgba(255,255,255,0.9) !important; }
+.bg-white\/10      { background-color: white !important; }
+
+/* Bordures */
+.border-white\/5   { border-color: var(--border) !important; }
+.border-white\/8   { border-color: var(--border) !important; }
+.border-white\/10  { border-color: var(--border) !important; }
+.border-white\/15  { border-color: var(--border-hover) !important; }
+.border-white\/20  { border-color: var(--border-hover) !important; }
+
+/* Placeholder */
+.placeholder\:text-white\/20::placeholder { color: var(--text-light) !important; }
+
+/* Inputs sombres */
+.bg-white\/5.border-white\/10 {
+  background-color: white !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Select options */
+option { background-color: white; color: var(--navy); }
+
+/* Hover dark */
+.hover\:bg-white\/5:hover  { background-color: var(--bg-secondary) !important; }
+.hover\:bg-white\/10:hover { background-color: var(--bg-secondary) !important; }
+.hover\:text-white:hover    { color: var(--navy) !important; }
+.hover\:text-white\/70:hover { color: var(--text-primary) !important; }
+
+/* Focus */
+.focus\:border-blue-500\/50:focus { border-color: var(--cyan-dark) !important; }
+
+/* Dashboard specific */
+.min-h-screen { background-color: var(--bg) !important; }

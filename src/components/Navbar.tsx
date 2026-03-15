@@ -28,7 +28,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <a href="#" className="flex items-center">
-            <img src={LOGO_SRC} alt="VCEL" className="h-8 w-auto" />
+            <img src={LOGO_SRC} alt="VCEL" className="h-8 w-auto" style={{ mixBlendMode: "multiply" }} />
           </a>
 
           {/* Links desktop */}
