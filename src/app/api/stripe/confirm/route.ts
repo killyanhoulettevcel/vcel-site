@@ -1,48 +1,67 @@
-// src/app/api/stripe/confirm/route.ts
-// Après SetupIntent réussi → créer l'abonnement mensuel
+// src/app/api/stripe/intent/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { supabaseAdmin } from '@/lib/supabase'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
+const PRICES = {
+  monthly: { priceId: 'price_1T1QK42fhxDJntt9VCBc77Gs', amount: 4900,  label: 'Mensuel 49€/mois' },
+  annual:  { priceId: 'price_1TABiy2fhxDJntt99715Z9e4', amount: 46800, label: 'Annuel 468€' },
+}
+
+// ID de la promotion SOLOFREE (1er mois gratuit — 49€)
+const SOLOFREE_PROMOTION_ID = 'promo_1TBZgJ2fhxDJntt9XdwyvgaH'
+
 export async function POST(req: NextRequest) {
-  const { setupIntentId, customerId, email, coupon } = await req.json()
+  const { plan, email, coupon } = await req.json()
+  const planData = PRICES[plan as keyof typeof PRICES] || PRICES.monthly
+
+  const isSolofree = coupon?.toUpperCase() === 'SOLOFREE'
 
   try {
-    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
-    if (setupIntent.status !== 'succeeded') {
-      return NextResponse.json({ error: 'Paiement non confirmé' }, { status: 400 })
-    }
-
-    const paymentMethodId = setupIntent.payment_method as string
-
-    // Attacher la méthode de paiement au customer
-    await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId })
-    await stripe.customers.update(customerId, {
-      invoice_settings: { default_payment_method: paymentMethodId }
-    })
-
-    // Créer l'abonnement
-    const subParams: any = {
-      customer: customerId,
-      items: [{ price: 'price_1T1QK42fhxDJntt9VCBc77Gs' }],
-      default_payment_method: paymentMethodId,
-      metadata: { source: 'vcel_site' },
-      expand: ['latest_invoice.payment_intent'],
-    }
-    if (coupon) subParams.coupon = coupon
-
-    const subscription = await stripe.subscriptions.create(subParams)
-
-    // Mettre à jour Supabase si l'email existe
+    // Créer ou récupérer le customer
+    let customerId: string | undefined
     if (email) {
-      await supabaseAdmin.from('users')
-        .update({ stripe_customer_id: customerId, statut: 'actif' })
-        .eq('email', email.toLowerCase())
+      const existing = await stripe.customers.list({ email, limit: 1 })
+      if (existing.data.length > 0) {
+        customerId = existing.data[0].id
+      } else {
+        const customer = await stripe.customers.create({ email })
+        customerId = customer.id
+      }
     }
 
-    return NextResponse.json({ success: true, subscriptionId: subscription.id })
+    if (plan === 'annual') {
+      // Paiement unique → PaymentIntent
+      // Avec SOLOFREE : 468€ - 49€ = 419€
+      const amount = isSolofree ? planData.amount - 4900 : planData.amount
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: 'eur',
+        customer: customerId,
+        metadata: { plan: 'annual', source: 'vcel_site', coupon: coupon || '' },
+        automatic_payment_methods: { enabled: true },
+        description: isSolofree ? 'Annuel 419€ (SOLOFREE)' : planData.label,
+      })
+      return NextResponse.json({ clientSecret: paymentIntent.client_secret, type: 'payment' })
+
+    } else {
+      // Abonnement mensuel → SetupIntent puis subscription
+      const setupIntent = await stripe.setupIntents.create({
+        customer: customerId,
+        usage: 'off_session',
+        metadata: {
+          plan: 'monthly',
+          priceId: planData.priceId,
+          coupon: coupon || '',
+          promotionId: isSolofree ? SOLOFREE_PROMOTION_ID : '',
+          source: 'vcel_site',
+        },
+        automatic_payment_methods: { enabled: true },
+      })
+      return NextResponse.json({ clientSecret: setupIntent.client_secret, type: 'setup', customerId })
+    }
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

@@ -84,8 +84,8 @@ export default function Pricing() {
               }
               <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200">
                 <span className="text-xs" style={{ color: '#A8BDD0' }}>Offre lancement :</span>
-                <code className="text-sm font-bold text-cyan-700">SOLO19</code>
-                <span className="text-xs" style={{ color: '#A8BDD0' }}>→ 1er mois à 19€</span>
+                <code className="text-sm font-bold text-cyan-700">SOLOFREE</code>
+                <span className="text-xs" style={{ color: '#A8BDD0' }}>→ 1er mois offert</span>
               </div>
             </div>
 

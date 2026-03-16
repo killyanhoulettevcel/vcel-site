@@ -411,7 +411,7 @@ function CheckoutContent() {
                     Code promo
                   </label>
                   <input type="text" value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())}
-                    placeholder="SOLO19"
+                    placeholder="SOLOFREE"
                     style={{
                       width: '100%', background: 'white', border: '1px solid rgba(13,27,42,0.08)',
                       borderRadius: '10px', padding: '10px 14px', fontSize: '14px',
@@ -421,9 +421,9 @@ function CheckoutContent() {
                     onFocus={e => { e.target.style.border = '1px solid #0288D1'; e.target.style.boxShadow = '0 0 0 3px rgba(79,195,247,0.15)' }}
                     onBlur={e  => { e.target.style.border = '1px solid rgba(13,27,42,0.08)'; e.target.style.boxShadow = 'none' }}
                   />
-                  {coupon === 'SOLO19' && (
+                  {coupon === 'SOLOFREE' && (
                     <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#2E7D32' }}>
-                      <Check size={11} /> Code valide — 1er mois à 19€
+                      <Check size={11} /> Code valide — 1er mois offert
                     </p>
                   )}
                 </div>
@@ -434,16 +434,16 @@ function CheckoutContent() {
                     <span style={{ color: '#3D5166' }}>VCEL {isAnnual ? 'Annuel' : 'Mensuel'}</span>
                     <span className="font-semibold" style={{ color: '#0D1B2A' }}>{prixDisplay}</span>
                   </div>
-                  {coupon === 'SOLO19' && !isAnnual && (
+                  {coupon === 'SOLOFREE' && (
                     <div className="flex items-center justify-between text-sm mb-2">
-                      <span style={{ color: '#2E7D32' }}>Code SOLO19</span>
-                      <span className="font-semibold" style={{ color: '#2E7D32' }}>−30€ ce mois</span>
+                      <span style={{ color: '#2E7D32' }}>Code SOLOFREE</span>
+                      <span className="font-semibold" style={{ color: '#2E7D32' }}>−49€ (1er mois offert)</span>
                     </div>
                   )}
                   <div className="border-t pt-2 mt-1 flex items-center justify-between" style={{ borderColor: 'rgba(13,27,42,0.08)' }}>
                     <span className="font-semibold text-sm" style={{ color: '#0D1B2A' }}>Total aujourd'hui</span>
                     <span className="font-bold text-xl" style={{ color: '#0D1B2A' }}>
-                      {isAnnual ? '468€' : coupon === 'SOLO19' ? '19€' : '49€'}
+                      {isAnnual ? (coupon === 'SOLOFREE' ? '419€' : '468€') : (coupon === 'SOLOFREE' ? '0€' : '49€')}
                     </span>
                   </div>
                 </div>
@@ -500,10 +500,10 @@ function CheckoutContent() {
                   style={{ background: '#F5F4F0', border: '1px solid rgba(13,27,42,0.08)' }}>
                   <span className="text-sm" style={{ color: '#3D5166' }}>
                     VCEL {isAnnual ? 'Annuel' : 'Mensuel'}
-                    {coupon === 'SOLO19' && !isAnnual ? ' + SOLO19' : ''}
+                    {coupon === 'SOLOFREE' ? ' + SOLOFREE' : ''}
                   </span>
                   <span className="font-bold" style={{ color: '#0D1B2A' }}>
-                    {isAnnual ? '468€' : coupon === 'SOLO19' ? '19€' : '49€'}
+                    {isAnnual ? (coupon === 'SOLOFREE' ? '419€' : '468€') : (coupon === 'SOLOFREE' ? '0€' : '49€')}
                   </span>
                 </div>
 

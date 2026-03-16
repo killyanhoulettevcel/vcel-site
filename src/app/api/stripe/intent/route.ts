@@ -5,13 +5,18 @@ import Stripe from 'stripe'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
 const PRICES = {
-  monthly: { priceId: 'price_1T1QK42fhxDJntt9VCBc77Gs', amount: 4900, label: 'Mensuel 49€/mois' },
+  monthly: { priceId: 'price_1T1QK42fhxDJntt9VCBc77Gs', amount: 4900,  label: 'Mensuel 49€/mois' },
   annual:  { priceId: 'price_1TABiy2fhxDJntt99715Z9e4', amount: 46800, label: 'Annuel 468€' },
 }
+
+// ID de la promotion SOLOFREE (1er mois gratuit — 49€)
+const SOLOFREE_PROMOTION_ID = 'promo_1TBZgJ2fhxDJntt9XdwyvgaH'
 
 export async function POST(req: NextRequest) {
   const { plan, email, coupon } = await req.json()
   const planData = PRICES[plan as keyof typeof PRICES] || PRICES.monthly
+
+  const isSolofree = coupon?.toUpperCase() === 'SOLOFREE'
 
   try {
     // Créer ou récupérer le customer
@@ -27,22 +32,32 @@ export async function POST(req: NextRequest) {
     }
 
     if (plan === 'annual') {
-      // Paiement unique 468€ → PaymentIntent
+      // Paiement unique → PaymentIntent
+      // Avec SOLOFREE : 468€ - 49€ = 419€
+      const amount = isSolofree ? planData.amount - 4900 : planData.amount
+
       const paymentIntent = await stripe.paymentIntents.create({
-        amount:   planData.amount,
+        amount,
         currency: 'eur',
         customer: customerId,
-        metadata: { plan: 'annual', source: 'vcel_site' },
+        metadata: { plan: 'annual', source: 'vcel_site', coupon: coupon || '' },
         automatic_payment_methods: { enabled: true },
-        description: planData.label,
+        description: isSolofree ? 'Annuel 419€ (SOLOFREE)' : planData.label,
       })
       return NextResponse.json({ clientSecret: paymentIntent.client_secret, type: 'payment' })
+
     } else {
       // Abonnement mensuel → SetupIntent puis subscription
       const setupIntent = await stripe.setupIntents.create({
         customer: customerId,
         usage: 'off_session',
-        metadata: { plan: 'monthly', priceId: planData.priceId, coupon: coupon || '', source: 'vcel_site' },
+        metadata: {
+          plan: 'monthly',
+          priceId: planData.priceId,
+          coupon: coupon || '',
+          promotionId: isSolofree ? SOLOFREE_PROMOTION_ID : '',
+          source: 'vcel_site',
+        },
         automatic_payment_methods: { enabled: true },
       })
       return NextResponse.json({ clientSecret: setupIntent.client_secret, type: 'setup', customerId })

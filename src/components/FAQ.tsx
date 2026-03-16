@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     q: "Mes données sont-elles en sécurité ?",
-    a: "Vos données financières restent dans votre propre Google Sheets. Notre base de données (Supabase) est hébergée en Europe, chiffrée au repos et en transit. Vous restez propriétaire de vos données."
+    a: "Vos données sont stockées sur notre infrastructure sécurisée (Supabase), hébergée en Europe, chiffrée au repos et en transit. Vous restez propriétaire de vos données et pouvez en demander la suppression à tout moment."
   },
   {
     q: "Que se passe-t-il si je résilie ?",
@@ -28,8 +28,8 @@ const faqs = [
     a: "Non. Le coach IA est un outil d'aide à la décision basé sur vos propres données. Il ne remplace pas un expert-comptable ou un conseiller financier. Pour des décisions importantes, consultez un professionnel."
   },
   {
-    q: "C'est quoi le code SOLO19 ?",
-    a: "Un code promotionnel de lancement qui réduit votre premier mois de 49€ à 19€. Il s'applique directement sur la page de paiement Stripe. Sans engagement, vous pouvez annuler avant le deuxième mois."
+    q: "C'est quoi le code SOLOFREE ?",
+    a: "Un code promotionnel de lancement qui offre votre premier mois gratuitement (valeur 49€). Il s'applique directement sur la page de paiement Stripe. Valable sur les abonnements mensuels et annuels. Sans engagement, résiliable avant le 2e mois."
   },
 ]
 
