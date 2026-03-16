@@ -43,24 +43,27 @@ export default function FAQ() {
           <p className="text-blue-400 text-sm font-semibold mb-3 tracking-wide uppercase">FAQ</p>
           <h2 className="font-display text-4xl font-bold text-white">Questions fréquentes</h2>
         </div>
-
         <div className="space-y-2">
           {faqs.map((f, i) => (
-            <div key={i}
+            <div
+              key={i}
               className={`border rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${
-                open === i ? 'border-white/15 bg-white/3' : 'border-white/6 hover:border-white/12'
+                open === i
+                  ? 'border-white/20 bg-white/5'
+                  : 'border-white/10 hover:border-white/20'
               }`}
-              onClick={() => setOpen(open === i ? null : i)}>
+              onClick={() => setOpen(open === i ? null : i)}
+            >
               <div className="flex items-center justify-between p-5 gap-4">
                 <span className={`text-sm font-medium leading-relaxed ${open === i ? 'text-white' : 'text-white/60'}`}>
                   {f.q}
                 </span>
-                <div className="shrink-0 text-white/30">
+                <div className="shrink-0 text-white/40">
                   {open === i ? <Minus size={14} /> : <Plus size={14} />}
                 </div>
               </div>
               {open === i && (
-                <div className="px-5 pb-5 text-white/45 text-sm leading-relaxed border-t border-white/6 pt-4">
+                <div className="px-5 pb-5 text-white/70 text-sm leading-relaxed border-t border-white/10 pt-4">
                   {f.a}
                 </div>
               )}
