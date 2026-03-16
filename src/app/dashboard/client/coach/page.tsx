@@ -100,17 +100,17 @@ export default function CoachPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)]">
       {/* Header */}
-      <div className="px-4 md:px-8 py-4 md:py-5 border-b border-white/5 flex items-center justify-between shrink-0">
+      <div className="px-4 md:px-8 py-4 md:py-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center">
             <Brain size={16} className="text-purple-400" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-white text-sm">Coach IA</h1>
+            <h1 className="font-display font-bold text-[var(--text-primary)] text-sm">Coach IA</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <p className="text-white/30 text-xs hidden sm:block">Disponible 24h/24 · GPT-4o mini</p>
-              <p className="text-white/30 text-xs sm:hidden">En ligne</p>
+              <p className="text-[var(--text-muted)] text-xs hidden sm:block">Disponible 24h/24 · GPT-4o mini</p>
+              <p className="text-[var(--text-muted)] text-xs sm:hidden">En ligne</p>
             </div>
           </div>
         </div>
@@ -142,11 +142,11 @@ export default function CoachPage() {
               <div className={`rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                 m.role === 'user'
                   ? 'bg-blue-500 text-white rounded-br-sm ml-8 md:ml-12'
-                  : 'bg-white/5 border border-white/8 text-white/85 rounded-bl-sm'
+                  : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] rounded-bl-sm'
               }`}>
                 {m.content}
               </div>
-              <p className={`text-white/20 text-xs mt-1 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+              <p className={`text-[var(--text-muted)] text-xs mt-1 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
                 {m.ts.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -157,11 +157,11 @@ export default function CoachPage() {
             <div className="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 border border-purple-500/20 flex items-center justify-center shrink-0">
               <Sparkles size={12} className="text-purple-400" />
             </div>
-            <div className="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl rounded-bl-sm px-4 py-3">
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function CoachPage() {
           <div className="flex flex-wrap gap-2">
             {suggestions.map(s => (
               <button key={s} onClick={() => send(s)}
-                className="text-xs px-3 py-1.5 md:py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">
+                className="text-xs px-3 py-1.5 md:py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition-all">
                 {s}
               </button>
             ))}
@@ -185,7 +185,7 @@ export default function CoachPage() {
 
       {/* Input */}
       <div className="px-4 md:px-8 pb-4 md:pb-6 shrink-0">
-        <div className="flex items-end gap-2 md:gap-3 bg-white/5 border border-white/10 rounded-2xl px-3 md:px-4 py-2.5 md:py-3 focus-within:border-blue-500/40 transition-colors">
+        <div className="flex items-end gap-2 md:gap-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl px-3 md:px-4 py-2.5 md:py-3 focus-within:border-blue-500/40 transition-colors">
           <textarea
             ref={textareaRef}
             value={input}
@@ -193,17 +193,17 @@ export default function CoachPage() {
             onKeyDown={handleKey}
             placeholder="Écris ici..."
             rows={1}
-            className="flex-1 bg-transparent text-white text-sm placeholder:text-white/20 focus:outline-none resize-none max-h-32"
+            className="flex-1 bg-transparent text-[var(--text-primary)] text-sm placeholder:text-[var(--text-muted)] focus:outline-none resize-none max-h-32"
             style={{ fieldSizing: 'content' } as any}
           />
           <button onClick={() => send()} disabled={!input.trim() || loading}
             className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-              input.trim() && !loading ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-white/5 text-white/20 cursor-not-allowed'
+              input.trim() && !loading ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] cursor-not-allowed'
             }`}>
             <Send size={14} />
           </button>
         </div>
-        <p className="text-white/15 text-xs text-center mt-1.5 hidden md:block">Shift+Entrée pour saut de ligne</p>
+        <p className="text-[var(--text-muted)] text-xs text-center mt-1.5 hidden md:block">Shift+Entrée pour saut de ligne</p>
       </div>
     </div>
   )

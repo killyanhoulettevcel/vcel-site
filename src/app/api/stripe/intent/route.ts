@@ -5,17 +5,15 @@ import Stripe from 'stripe'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
 const PRICES = {
-  monthly: { priceId: 'price_1T1QK42fhxDJntt9VCBc77Gs', amount: 4900,  label: 'Mensuel 49€/mois' },
-  annual:  { priceId: 'price_1TABiy2fhxDJntt99715Z9e4', amount: 46800, label: 'Annuel 468€' },
+  monthly: { priceId: 'price_1T1QK42fhxDJntt9VCBc77Gs', label: 'Mensuel 49€/mois' },
+  annual:  { priceId: 'price_1TABiy2fhxDJntt99715Z9e4', label: 'Annuel 468€/an' },
 }
 
-// ID de la promotion SOLOFREE (1er mois gratuit — 49€)
 const SOLOFREE_PROMOTION_ID = 'promo_1TBZgJ2fhxDJntt9XdwyvgaH'
 
 export async function POST(req: NextRequest) {
   const { plan, email, coupon } = await req.json()
   const planData = PRICES[plan as keyof typeof PRICES] || PRICES.monthly
-
   const isSolofree = coupon?.toUpperCase() === 'SOLOFREE'
 
   try {
@@ -23,45 +21,30 @@ export async function POST(req: NextRequest) {
     let customerId: string | undefined
     if (email) {
       const existing = await stripe.customers.list({ email, limit: 1 })
-      if (existing.data.length > 0) {
-        customerId = existing.data[0].id
-      } else {
-        const customer = await stripe.customers.create({ email })
-        customerId = customer.id
-      }
+      customerId = existing.data.length > 0
+        ? existing.data[0].id
+        : (await stripe.customers.create({ email })).id
     }
 
-    if (plan === 'annual') {
-      // Paiement unique → PaymentIntent
-      // Avec SOLOFREE : 468€ - 49€ = 419€
-      const amount = isSolofree ? planData.amount - 4900 : planData.amount
+    // Même flow pour mensuel ET annuel : SetupIntent → confirm → subscription
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      usage: 'off_session',
+      metadata: {
+        plan,
+        priceId: planData.priceId,
+        coupon: coupon || '',
+        promotionId: isSolofree ? SOLOFREE_PROMOTION_ID : '',
+        source: 'vcel_site',
+      },
+      automatic_payment_methods: { enabled: true },
+    })
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount,
-        currency: 'eur',
-        customer: customerId,
-        metadata: { plan: 'annual', source: 'vcel_site', coupon: coupon || '' },
-        automatic_payment_methods: { enabled: true },
-        description: isSolofree ? 'Annuel 419€ (SOLOFREE)' : planData.label,
-      })
-      return NextResponse.json({ clientSecret: paymentIntent.client_secret, type: 'payment' })
-
-    } else {
-      // Abonnement mensuel → SetupIntent puis subscription
-      const setupIntent = await stripe.setupIntents.create({
-        customer: customerId,
-        usage: 'off_session',
-        metadata: {
-          plan: 'monthly',
-          priceId: planData.priceId,
-          coupon: coupon || '',
-          promotionId: isSolofree ? SOLOFREE_PROMOTION_ID : '',
-          source: 'vcel_site',
-        },
-        automatic_payment_methods: { enabled: true },
-      })
-      return NextResponse.json({ clientSecret: setupIntent.client_secret, type: 'setup', customerId })
-    }
+    return NextResponse.json({
+      clientSecret: setupIntent.client_secret,
+      type: 'setup',
+      customerId,
+    })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

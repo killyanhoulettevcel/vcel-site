@@ -68,7 +68,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-5 flex items-center justify-between border-b border-[var(--border)]">
         <a href="/" className="flex items-center gap-2.5">
-          <img src={LOGO_SRC} alt="VCEL" className="h-7 w-auto" style={{ mixBlendMode: "multiply" }} />
+          <img src={LOGO_SRC} alt="VCEL" className="h-7 w-auto"  />
         </a>
         <button onClick={() => setOpen(false)} className="lg:hidden text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1">
           <X size={18} />
@@ -86,7 +86,7 @@ export default function Sidebar() {
             <p className="text-[var(--text-muted)] text-xs truncate">{email}</p>
           </div>
           {role === 'admin' && (
-            <span className="text-xs bg-[var(--navy)] text-white px-1.5 py-0.5 rounded-md font-semibold">Admin</span>
+            <span className="text-xs bg-cyan-100 text-cyan-800 border border-cyan-200 px-1.5 py-0.5 rounded-md font-semibold">Admin</span>
           )}
         </div>
       </div>
@@ -138,7 +138,7 @@ export default function Sidebar() {
       {/* Topbar mobile */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 topbar flex items-center justify-between px-4">
         <a href="/" className="flex items-center">
-          <img src={LOGO_SRC} alt="VCEL" className="h-6 w-auto" style={{ mixBlendMode: "multiply" }} />
+          <img src={LOGO_SRC} alt="VCEL" className="h-6 w-auto"  />
         </a>
         <button onClick={() => setOpen(true)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1.5 rounded-lg hover:bg-[var(--bg-secondary)]">
           <Menu size={20} />
