@@ -37,17 +37,20 @@ function PaymentForm({
 }) {
   const stripe   = useStripe()
   const elements = useElements()
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [loading,        setLoading]        = useState(false)
+  const [error,          setError]          = useState('')
+  const [acceptCGV,      setAcceptCGV]      = useState(false)
+  const [acceptRetract,  setAcceptRetract]  = useState(false)
+
+  const canPay = acceptCGV && acceptRetract
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!stripe || !elements) return
+    if (!stripe || !elements || !canPay) return
     setLoading(true); setError('')
 
     try {
       if (type === 'payment') {
-        // Paiement unique annuel
         const { error: stripeError } = await stripe.confirmPayment({
           elements,
           confirmParams: {
@@ -56,7 +59,6 @@ function PaymentForm({
         })
         if (stripeError) { setError(stripeError.message || 'Erreur'); setLoading(false); return }
       } else {
-        // Abonnement mensuel — d'abord confirmer le SetupIntent
         const { setupIntent, error: stripeError } = await stripe.confirmSetup({
           elements,
           confirmParams: { return_url: `${window.location.origin}/activate?plan=monthly` },
@@ -65,7 +67,6 @@ function PaymentForm({
         if (stripeError) { setError(stripeError.message || 'Erreur'); setLoading(false); return }
 
         if (setupIntent?.status === 'succeeded') {
-          // Créer l'abonnement côté serveur
           const res = await fetch('/api/stripe/confirm', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -89,25 +90,25 @@ function PaymentForm({
           appearance: {
             theme: 'flat',
             variables: {
-              colorPrimary:       '#0D1B2A',
-              colorBackground:    '#ffffff',
-              colorText:          '#0D1B2A',
-              colorDanger:        '#dc2626',
-              fontFamily:         'DM Sans, sans-serif',
-              spacingUnit:        '4px',
-              borderRadius:       '10px',
+              colorPrimary:         '#0D1B2A',
+              colorBackground:      '#ffffff',
+              colorText:            '#0D1B2A',
+              colorDanger:          '#dc2626',
+              fontFamily:           'DM Sans, sans-serif',
+              spacingUnit:          '4px',
+              borderRadius:         '10px',
               colorTextPlaceholder: '#A8BDD0',
             },
             rules: {
               '.Input': {
-                border:     '1px solid rgba(13,27,42,0.08)',
-                boxShadow:  'none',
-                fontSize:   '14px',
-                padding:    '10px 14px',
+                border:    '1px solid rgba(13,27,42,0.08)',
+                boxShadow: 'none',
+                fontSize:  '14px',
+                padding:   '10px 14px',
               },
               '.Input:focus': {
-                border:     '1px solid #0288D1',
-                boxShadow:  '0 0 0 3px rgba(79,195,247,0.15)',
+                border:    '1px solid #0288D1',
+                boxShadow: '0 0 0 3px rgba(79,195,247,0.15)',
               },
               '.Label': {
                 fontSize:   '12px',
@@ -115,17 +116,66 @@ function PaymentForm({
                 color:      '#3D5166',
               },
               '.Tab': {
-                border:        '1px solid rgba(13,27,42,0.08)',
-                borderRadius:  '10px',
+                border:       '1px solid rgba(13,27,42,0.08)',
+                borderRadius: '10px',
               },
               '.Tab--selected': {
-                border:        '1px solid #0D1B2A',
+                border:          '1px solid #0D1B2A',
                 backgroundColor: '#0D1B2A',
-                color:         'white',
+                color:           'white',
               },
             }
           }
         }} />
+      </div>
+
+      {/* ── Cases à cocher légales ── */}
+      <div className="space-y-3 rounded-xl p-4" style={{ background: '#F5F4F0', border: '1px solid rgba(13,27,42,0.08)' }}>
+
+        {/* Case 1 — Rétractation */}
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <div
+            onClick={() => setAcceptRetract(!acceptRetract)}
+            className="shrink-0 mt-0.5 w-5 h-5 rounded flex items-center justify-center transition-all"
+            style={{
+              backgroundColor: acceptRetract ? '#0D1B2A' : 'white',
+              border: acceptRetract ? '2px solid #0D1B2A' : '2px solid rgba(13,27,42,0.20)',
+              cursor: 'pointer',
+            }}>
+            {acceptRetract && <Check size={11} style={{ color: 'white' }} />}
+          </div>
+          <span className="text-xs leading-relaxed" style={{ color: '#3D5166' }}>
+            Je renonce expressément à mon droit de rétractation conformément à l'article L221-28 du Code de la consommation, 
+            le service numérique étant fourni immédiatement après le paiement. <span style={{ color: '#C62828', fontWeight: 600 }}>*</span>
+          </span>
+        </label>
+
+        {/* Case 2 — CGV/CGU/Confidentialité */}
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <div
+            onClick={() => setAcceptCGV(!acceptCGV)}
+            className="shrink-0 mt-0.5 w-5 h-5 rounded flex items-center justify-center transition-all"
+            style={{
+              backgroundColor: acceptCGV ? '#0D1B2A' : 'white',
+              border: acceptCGV ? '2px solid #0D1B2A' : '2px solid rgba(13,27,42,0.20)',
+              cursor: 'pointer',
+            }}>
+            {acceptCGV && <Check size={11} style={{ color: 'white' }} />}
+          </div>
+          <span className="text-xs leading-relaxed" style={{ color: '#3D5166' }}>
+            J'accepte les{' '}
+            <a href="/legal?tab=cgv" target="_blank" className="text-cyan-600 hover:underline font-medium">CGV</a>,{' '}
+            les{' '}
+            <a href="/legal?tab=cgu" target="_blank" className="text-cyan-600 hover:underline font-medium">CGU</a>{' '}
+            et la{' '}
+            <a href="/legal?tab=confidentialite" target="_blank" className="text-cyan-600 hover:underline font-medium">politique de confidentialité</a>{' '}
+            de VCEL. <span style={{ color: '#C62828', fontWeight: 600 }}>*</span>
+          </span>
+        </label>
+
+        <p className="text-xs" style={{ color: '#A8BDD0' }}>
+          <span style={{ color: '#C62828' }}>*</span> Champs obligatoires pour finaliser le paiement.
+        </p>
       </div>
 
       {error && (
@@ -135,13 +185,14 @@ function PaymentForm({
         </div>
       )}
 
-      <button type="submit" disabled={!stripe || loading}
-        className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-semibold text-sm text-white transition-all"
+      <button type="submit" disabled={!stripe || loading || !canPay}
+        className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-semibold text-sm transition-all"
         style={{
-          background:   loading ? '#2C4A6E' : '#0D1B2A',
-          cursor:       loading || !stripe ? 'not-allowed' : 'pointer',
-          boxShadow:    '0 4px 16px rgba(13,27,42,0.20)',
-          opacity:      !stripe ? 0.6 : 1,
+          background:  !canPay ? '#A8BDD0' : loading ? '#2C4A6E' : '#0D1B2A',
+          color:       'white',
+          cursor:      loading || !stripe || !canPay ? 'not-allowed' : 'pointer',
+          boxShadow:   canPay ? '0 4px 16px rgba(13,27,42,0.20)' : 'none',
+          opacity:     !stripe ? 0.6 : 1,
         }}>
         {loading ? (
           <>
@@ -153,13 +204,19 @@ function PaymentForm({
           </>
         ) : (
           <>
-            <Lock size={14} style={{ color: '#4FC3F7' }} />
+            <Lock size={14} style={{ color: canPay ? '#4FC3F7' : 'white' }} />
             {type === 'payment' ? 'Payer 468€' : 'Commencer l\'abonnement'}
           </>
         )}
       </button>
 
-      <p className="text-center text-[var(--text-light)] text-xs">
+      {!canPay && (
+        <p className="text-center text-xs" style={{ color: '#A8BDD0' }}>
+          Veuillez cocher les deux cases pour activer le paiement.
+        </p>
+      )}
+
+      <p className="text-center text-xs" style={{ color: '#A8BDD0' }}>
         Paiement sécurisé · Chiffrement SSL · Powered by Stripe
       </p>
     </form>
@@ -173,8 +230,8 @@ function SuccessView({ plan }: { plan: string }) {
       <div className="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-200 flex items-center justify-center mx-auto mb-5">
         <Check size={28} className="text-emerald-600" />
       </div>
-      <h2 className="font-display text-2xl text-[var(--navy)] mb-2">Paiement confirmé !</h2>
-      <p className="text-[var(--text-secondary)] text-sm mb-6">
+      <h2 className="font-display text-2xl mb-2" style={{ color: '#0D1B2A' }}>Paiement confirmé !</h2>
+      <p className="text-sm mb-6" style={{ color: '#3D5166' }}>
         {plan === 'annual'
           ? 'Votre abonnement annuel est activé. Vous recevrez un email de confirmation.'
           : 'Votre abonnement mensuel est activé. Accès immédiat à votre espace client.'
@@ -193,18 +250,17 @@ function CheckoutContent() {
   const searchParams = useSearchParams()
   const plan         = searchParams.get('plan') === 'annual' ? 'annual' : 'monthly'
 
-  const [step,         setStep]         = useState<'info' | 'payment' | 'success'>('info')
-  const [clientSecret, setClientSecret] = useState('')
-  const [intentType,   setIntentType]   = useState<'payment' | 'setup'>('setup')
-  const [customerId,   setCustomerId]   = useState('')
-  const [email,        setEmail]        = useState('')
-  const [coupon,       setCoupon]       = useState('')
-  const [loadingIntent,setLoadingIntent]= useState(false)
-  const [error,        setError]        = useState('')
+  const [step,          setStep]          = useState<'info' | 'payment' | 'success'>('info')
+  const [clientSecret,  setClientSecret]  = useState('')
+  const [intentType,    setIntentType]    = useState<'payment' | 'setup'>('setup')
+  const [customerId,    setCustomerId]    = useState('')
+  const [email,         setEmail]         = useState('')
+  const [coupon,        setCoupon]        = useState('')
+  const [loadingIntent, setLoadingIntent] = useState(false)
+  const [error,         setError]         = useState('')
 
   const isAnnual    = plan === 'annual'
   const prixDisplay = isAnnual ? '468€' : '49€/mois'
-  const prixMensuel = isAnnual ? 39 : 49
 
   const handleContinue = async () => {
     setLoadingIntent(true); setError('')
@@ -224,18 +280,13 @@ function CheckoutContent() {
     setLoadingIntent(false)
   }
 
-  const stripeOptions = {
-    clientSecret,
-    appearance: { theme: 'flat' as const },
-  }
-
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#F5F4F0' }}>
       {/* Header */}
       <header className="bg-white border-b px-6 py-4" style={{ borderColor: 'rgba(13,27,42,0.08)' }}>
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <a href="/">
-            <img src="/logo.png" alt="VCEL" className="h-7 w-auto" style={{ mixBlendMode: 'multiply' }} />
+            <img src="/logo.png" alt="VCEL" className="h-7 w-auto" style={{ mixBlendMode: 'darken' }} />
           </a>
           <div className="flex items-center gap-2 text-xs" style={{ color: '#7A90A4' }}>
             <Lock size={12} style={{ color: '#10b981' }} />
@@ -251,8 +302,8 @@ function CheckoutContent() {
           <div>
             <a href="/#tarifs" className="inline-flex items-center gap-2 text-sm mb-8 transition-colors"
               style={{ color: '#7A90A4' }}
-              onMouseEnter={e => (e.target as HTMLElement).style.color = '#0D1B2A'}
-              onMouseLeave={e => (e.target as HTMLElement).style.color = '#7A90A4'}>
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#0D1B2A'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#7A90A4'}>
               <ArrowLeft size={16} /> Retour aux tarifs
             </a>
 
@@ -406,9 +457,10 @@ function CheckoutContent() {
                 )}
 
                 <button onClick={handleContinue} disabled={loadingIntent || !email}
-                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-semibold text-sm text-white transition-all"
+                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-semibold text-sm transition-all"
                   style={{
                     background:  loadingIntent ? '#2C4A6E' : '#0D1B2A',
+                    color:       'white',
                     cursor:      loadingIntent || !email ? 'not-allowed' : 'pointer',
                     boxShadow:   '0 4px 16px rgba(13,27,42,0.20)',
                     opacity:     !email ? 0.6 : 1,
@@ -434,7 +486,6 @@ function CheckoutContent() {
                 </p>
               </>
             ) : (
-              /* Étape paiement — Stripe Elements */
               <>
                 <div className="flex items-center gap-3 mb-6">
                   <button onClick={() => setStep('info')} className="p-1.5 rounded-lg transition-colors"
@@ -478,7 +529,7 @@ export default function CheckoutPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#F5F4F0' }}>
-        <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#0D1B2A', borderTopColor: 'transparent' }} />
+        <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: '#0D1B2A', borderTopColor: 'transparent' }} />
       </div>
     }>
       <CheckoutContent />
