@@ -87,7 +87,7 @@ export default function Contact() {
               </button>
 
               <p className="text-center text-white/20 text-xs">
-                Ou écrivez directement à <a href="mailto:hello@votrecommerceenligne.fr" className="underline hover:text-white/40">hello@votrecommerceenligne.fr</a>
+                Ou écrivez directement à <a href="mailto:contact@vcel.fr" className="underline hover:text-white/40">contact@vcel.fr</a>
               </p>
             </div>
           )}
