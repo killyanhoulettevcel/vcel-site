@@ -153,6 +153,12 @@ export default function OnboardingPage() {
           Suivez ces {steps.length} étapes pour découvrir toute la valeur de VCEL.
           Votre progression est détectée automatiquement.
         </p>
+        <button
+          onClick={() => router.push('/dashboard/client')}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+        >
+          ← Retour au dashboard
+        </button>
       </div>
 
       {/* Progress card */}
