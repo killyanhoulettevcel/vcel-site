@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { CheckCircle, ChevronRight, Zap, Users, FileText, Activity, User, ArrowRight, PartyPopper, Sparkles } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
 interface Step {
@@ -76,6 +77,7 @@ const steps: Step[] = [
 export default function OnboardingPage() {
   const { data: session } = useSession()
   const nom = session?.user?.name?.split(' ')[0] || 'vous'
+  const router = useRouter()
 
   const [completed, setCompleted] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -202,9 +204,9 @@ export default function OnboardingPage() {
           <p className="text-white/40 text-sm mb-4">
             Vous avez découvert toutes les fonctionnalités. Votre business est maintenant automatisé.
           </p>
-          <a href="/dashboard/client" className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity">
+          <button onClick={() => router.push('/dashboard/client')} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity">
             Voir mon dashboard <ArrowRight size={14} />
-          </a>
+          </button>
         </div>
       )}
 
