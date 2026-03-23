@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Users, Activity, Settings, LogOut,
   Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload,
-  CalendarDays, ShoppingBag, Zap, Menu, X, Bell
+  CalendarDays, ShoppingBag, Zap, Menu, X, Bell, HeartPulse
 } from 'lucide-react'
 
 interface NavItem { label: string; href: string; icon: React.ElementType; adminOnly?: boolean }
@@ -16,6 +16,7 @@ const navGroups = [
     items: [
       { label: 'Dashboard',        href: '/dashboard/client',             icon: LayoutDashboard },
       { label: 'Démarrage',        href: '/dashboard/client/onboarding',  icon: Rocket },
+      { label: 'Score santé',      href: '/dashboard/client/score',       icon: HeartPulse },
     ]
   },
   {
