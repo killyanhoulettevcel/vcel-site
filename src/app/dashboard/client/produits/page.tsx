@@ -79,6 +79,8 @@ export default function ProduitsPage() {
   const [connecteurTab, setConnecteurTab] = useState<'shopify'|'woocommerce'|'stripe'>('shopify')
   const [shopifyForm,  setShopifyForm]  = useState({ shop_url: '', api_key: '' })
   const [wooForm,      setWooForm]      = useState({ shop_url: '', api_key: '', api_secret: '' })
+  const [stripeForm,   setStripeForm]   = useState({ stripe_key: '' })
+  const [stripeKeySet, setStripeKeySet] = useState(false)
 
   // Stats
   const totalProduits  = produits.length
@@ -572,11 +574,38 @@ export default function ProduitsPage() {
 
             {connecteurTab === 'stripe' && (
               <div className="space-y-4">
-                <p className="text-white/40 text-sm">Stripe est déjà connecté via votre clé <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">STRIPE_SECRET_KEY</code>.</p>
-                <p className="text-white/30 text-xs">La sync va importer vos produits Stripe et les 30 derniers jours de paiements.</p>
-                <button onClick={() => syncSource('stripe', {})} disabled={!!syncing}
+                <p className="text-white/40 text-xs mb-2">
+                  Renseignez votre clé secrète Stripe pour importer vos produits et paiements.<br />
+                  Trouvez-la sur <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">dashboard.stripe.com/apikeys</a>
+                </p>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Clé secrète Stripe</label>
+                  <input
+                    type="password"
+                    value={stripeForm.stripe_key}
+                    onChange={e => setStripeForm({ stripe_key: e.target.value })}
+                    placeholder="sk_live_... ou sk_test_..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
+                  />
+                  <p className="text-white/20 text-xs mt-1.5">Votre clé est chiffrée et stockée uniquement sur votre compte.</p>
+                </div>
+                {stripeKeySet && (
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs">
+                    ✓ Clé Stripe enregistrée — vous pouvez relancer la sync sans la ressaisir.
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    if (!stripeForm.stripe_key && !stripeKeySet) return
+                    await syncSource('stripe', stripeForm.stripe_key ? { stripe_key: stripeForm.stripe_key } : {})
+                    if (stripeForm.stripe_key) setStripeKeySet(true)
+                  }}
+                  disabled={!!syncing || (!stripeForm.stripe_key && !stripeKeySet)}
                   className="btn-primary w-full justify-center disabled:opacity-40">
-                  {syncing === 'stripe' ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Zap size={14} /> Synchroniser Stripe maintenant</>}
+                  {syncing === 'stripe'
+                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <><Zap size={14} /> Synchroniser Stripe</>
+                  }
                 </button>
               </div>
             )}

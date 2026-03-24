@@ -1,4 +1,7 @@
 // src/app/api/produits/sync/stripe/route.ts
+// Synchronise les produits et paiements Stripe de l'UTILISATEUR
+// La clé Stripe est stockée dans users.stripe_secret_key (propre à chaque user)
+
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -9,12 +12,46 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
   const userId = (session.user as any).id
 
-  const stripeKey = process.env.STRIPE_SECRET_KEY
-  if (!stripeKey) return NextResponse.json({ error: 'Clé Stripe manquante' }, { status: 500 })
+  const body = await req.json().catch(() => ({}))
+
+  // Récupérer la clé Stripe : priorité à la clé envoyée dans le body (première config)
+  // sinon on lit celle sauvegardée en base pour cet utilisateur
+  let stripeKey = body.stripe_key?.trim()
+
+  if (!stripeKey) {
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('stripe_secret_key')
+      .eq('id', userId)
+      .single()
+    stripeKey = user?.stripe_secret_key
+  }
+
+  if (!stripeKey) {
+    return NextResponse.json({ error: 'Aucune clé Stripe configurée. Renseignez votre clé dans le modal.' }, { status: 400 })
+  }
+
+  // Valider le format de la clé (sk_live_ ou sk_test_)
+  if (!stripeKey.startsWith('sk_live_') && !stripeKey.startsWith('sk_test_')) {
+    return NextResponse.json({ error: 'Clé Stripe invalide. Elle doit commencer par sk_live_ ou sk_test_' }, { status: 400 })
+  }
+
+  // Sauvegarder la clé en base pour les prochaines syncs
+  await supabaseAdmin
+    .from('users')
+    .update({ stripe_secret_key: stripeKey })
+    .eq('id', userId)
 
   const headers = { Authorization: `Bearer ${stripeKey}` }
 
   try {
+    // Vérifier que la clé est valide avant de continuer
+    const testRes = await fetch('https://api.stripe.com/v1/account', { headers })
+    if (!testRes.ok) {
+      const err = await testRes.json()
+      return NextResponse.json({ error: `Clé Stripe invalide : ${err.error?.message || 'Accès refusé'}` }, { status: 400 })
+    }
+
     // Récupérer les produits Stripe
     const prodRes = await fetch('https://api.stripe.com/v1/products?limit=100&active=true', { headers })
     const { data: stripeProducts } = await prodRes.json()
@@ -51,7 +88,6 @@ export async function POST(req: NextRequest) {
       produitsSynced++
     }
 
-    // Ventes depuis payment_intents réussis
     for (const charge of charges || []) {
       if (charge.status !== 'succeeded') continue
       await supabaseAdmin.from('ventes').upsert({
