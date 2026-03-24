@@ -1,8 +1,33 @@
 // src/app/api/produits/sync/stripe/route.ts
+// Un produit Stripe avec N tarifs → N lignes dans la table produits
+
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+
+function getPrixLabel(price: any): string {
+  const amount   = (price.unit_amount || 0) / 100
+  const currency = (price.currency || 'eur').toUpperCase()
+  if (price.recurring) {
+    const interval = price.recurring.interval
+    const count    = price.recurring.interval_count || 1
+    const libelle  = count > 1
+      ? `${count} ${interval === 'month' ? 'mois' : interval === 'year' ? 'ans' : interval}s`
+      : interval === 'month' ? 'mois' : interval === 'year' ? 'an' : interval
+    return `${amount}€/${libelle}`
+  }
+  return `${amount}€ (achat unique)`
+}
+
+function getTypeProduit(price: any): string {
+  if (!price.recurring) return 'one_shot'
+  const interval = price.recurring.interval
+  if (interval === 'year')  return 'abonnement_annuel'
+  if (interval === 'month') return 'abonnement_mensuel'
+  if (interval === 'week')  return 'abonnement_hebdo'
+  return 'abonnement'
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -11,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
 
-  // Récupérer la clé Stripe : body en priorité, sinon base
+  // Clé Stripe : body en priorité, sinon base
   let stripeKey = body.stripe_key?.trim()
   if (!stripeKey) {
     const { data: user } = await supabaseAdmin
@@ -19,9 +44,7 @@ export async function POST(req: NextRequest) {
     stripeKey = user?.stripe_secret_key
   }
 
-  if (!stripeKey) {
-    return NextResponse.json({ error: 'Aucune clé Stripe configurée.' }, { status: 400 })
-  }
+  if (!stripeKey) return NextResponse.json({ error: 'Aucune clé Stripe configurée.' }, { status: 400 })
   if (!stripeKey.startsWith('sk_live_') && !stripeKey.startsWith('sk_test_')) {
     return NextResponse.json({ error: 'Clé Stripe invalide (sk_live_... ou sk_test_...)' }, { status: 400 })
   }
@@ -39,125 +62,131 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // ── Produits + Prix ──────────────────────────────────────────────────────
+    // ── Récupérer produits + TOUS les prix ───────────────────────────────────
     const [prodRes, pricesRes] = await Promise.all([
       fetch('https://api.stripe.com/v1/products?limit=100&active=true', { headers }),
-      fetch('https://api.stripe.com/v1/prices?limit=100&active=true&expand[]=data.recurring', { headers }),
+      fetch('https://api.stripe.com/v1/prices?limit=100&active=true', { headers }),
     ])
     const { data: stripeProducts = [] } = await prodRes.json()
     const { data: stripePrices = [] }   = await pricesRes.json()
 
-    // Map produit_id → infos prix
-    const priceMap: Record<string, { amount: number; type: string; interval?: string }> = {}
+    // Grouper les prix par produit_id — TOUS les prix, pas juste le premier
+    const pricesByProduct: Record<string, any[]> = {}
     for (const price of stripePrices) {
-      if (!priceMap[price.product]) {
-        const amount   = (price.unit_amount || 0) / 100
-        const isRecurring = !!price.recurring
-        const interval = price.recurring?.interval // 'month', 'year', 'week'
-        priceMap[price.product] = {
-          amount,
-          type: isRecurring
-            ? interval === 'year' ? 'abonnement_annuel'
-            : interval === 'month' ? 'abonnement_mensuel'
-            : 'abonnement'
-            : 'one_shot',
-          interval,
-        }
-      }
+      if (!pricesByProduct[price.product]) pricesByProduct[price.product] = []
+      pricesByProduct[price.product].push(price)
     }
 
     let produitsSynced = 0
-    const stripeIdToDbId: Record<string, string> = {}
+    // Map stripe_price_id → db product id (pour lier les ventes)
+    const stripePriceToDbId: Record<string, string> = {}
 
     for (const p of stripeProducts) {
-      const prixInfo = priceMap[p.id] || { amount: 0, type: 'one_shot' }
+      const prices = pricesByProduct[p.id] || []
 
-      // Chercher si le produit existe déjà
-      const { data: existing } = await supabaseAdmin
-        .from('produits')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('source', 'stripe')
-        .eq('stripe_product_id', p.id)
-        .single()
-
-      const payload = {
-        user_id:          userId,
-        nom:              p.name,
-        description:      p.description || '',
-        prix_vente:       prixInfo.amount,
-        cout_revient:     0,
-        stock:            0,
-        source:           'stripe',
-        stripe_product_id: p.id,
-        type_produit:     prixInfo.type,
-        actif:            p.active,
-        updated_at:       new Date().toISOString(),
+      if (prices.length === 0) {
+        // Produit sans prix — on crée quand même une ligne
+        prices.push({ id: null, unit_amount: 0, recurring: null, currency: 'eur' })
       }
 
-      let dbId: string
-      if (existing?.id) {
-        await supabaseAdmin.from('produits').update(payload).eq('id', existing.id)
-        dbId = existing.id
-      } else {
-        const { data: inserted } = await supabaseAdmin.from('produits').insert(payload).select('id').single()
-        dbId = inserted?.id
-      }
+      for (const price of prices) {
+        const typeProduit = getTypeProduit(price)
+        const prixLabel   = price.id ? getPrixLabel(price) : ''
+        // Nom = nom produit + label prix si plusieurs tarifs
+        const nomComplet  = prices.length > 1 && price.id
+          ? `${p.name} · ${prixLabel}`
+          : p.name
 
-      if (dbId) stripeIdToDbId[p.id] = dbId
-      produitsSynced++
+        // Chercher si cette combinaison produit+prix existe déjà
+        const { data: existing } = await supabaseAdmin
+          .from('produits')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('stripe_product_id', p.id)
+          .eq('stripe_price_id', price.id || '')
+          .single()
+
+        const payload: any = {
+          user_id:          userId,
+          nom:              nomComplet,
+          description:      p.description || '',
+          prix_vente:       (price.unit_amount || 0) / 100,
+          cout_revient:     0,
+          stock:            0,
+          source:           'stripe',
+          stripe_product_id: p.id,
+          stripe_price_id:  price.id || '',
+          type_produit:     typeProduit,
+          actif:            p.active,
+          updated_at:       new Date().toISOString(),
+        }
+
+        let dbId: string | undefined
+        if (existing?.id) {
+          await supabaseAdmin.from('produits').update(payload).eq('id', existing.id)
+          dbId = existing.id
+        } else {
+          const { data: inserted } = await supabaseAdmin
+            .from('produits').insert(payload).select('id').single()
+          dbId = inserted?.id
+        }
+
+        if (dbId && price.id) stripePriceToDbId[price.id] = dbId
+        produitsSynced++
+      }
     }
 
     // ── Ventes depuis PaymentIntents ─────────────────────────────────────────
     const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000)
     const chargesRes = await fetch(
-      `https://api.stripe.com/v1/payment_intents?limit=100&created[gte]=${since}&expand[]=data.latest_charge`,
+      `https://api.stripe.com/v1/payment_intents?limit=100&created[gte]=${since}`,
       { headers }
     )
     const { data: charges = [] } = await chargesRes.json()
 
-    // Récupérer aussi les subscriptions pour lier aux produits
-    const subsRes = await fetch(
-      `https://api.stripe.com/v1/subscriptions?limit=100&status=active&expand[]=data.items.data.price.product`,
+    // Récupérer les line items des invoices pour lier au bon price_id
+    const invoicesRes = await fetch(
+      `https://api.stripe.com/v1/invoices?limit=100&created[gte]=${since}&expand[]=data.lines.data.price`,
       { headers }
     )
-    const { data: subscriptions = [] } = await subsRes.json()
+    const { data: invoices = [] } = await invoicesRes.json()
 
-    // Map customer → produit Stripe ID via subscriptions
-    const customerProductMap: Record<string, string> = {}
-    for (const sub of subscriptions) {
-      const customerId = sub.customer
-      const productId  = sub.items?.data?.[0]?.price?.product?.id || sub.items?.data?.[0]?.price?.product
-      if (customerId && productId) customerProductMap[customerId] = productId
+    // Map payment_intent_id → price_id (via invoice)
+    const intentToPriceId: Record<string, string> = {}
+    for (const inv of invoices) {
+      if (inv.payment_intent && inv.lines?.data?.[0]?.price?.id) {
+        intentToPriceId[inv.payment_intent] = inv.lines.data[0].price.id
+      }
     }
 
     let ventesSynced = 0
     for (const charge of charges) {
       if (charge.status !== 'succeeded') continue
 
-      // Trouver le produit DB associé
-      const stripeProductId = customerProductMap[charge.customer] || null
-      const produitId       = stripeProductId ? stripeIdToDbId[stripeProductId] : null
-
-      // Vérifier si déjà importé
+      // Vérifier doublon
       const { data: existingVente } = await supabaseAdmin
-        .from('ventes')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('stripe_payment_id', charge.id)
-        .single()
-
+        .from('ventes').select('id')
+        .eq('user_id', userId).eq('stripe_payment_id', charge.id).single()
       if (existingVente) continue
 
+      const priceId   = intentToPriceId[charge.id]
+      const produitId = priceId ? stripePriceToDbId[priceId] : null
+
+      // Nom du produit depuis le price_id si possible
+      const matchingPrice   = stripePrices.find((pr: any) => pr.id === priceId)
+      const matchingProduct = matchingPrice
+        ? stripeProducts.find((p: any) => p.id === matchingPrice.product)
+        : null
+
       await supabaseAdmin.from('ventes').insert({
-        user_id:          userId,
-        produit_id:       produitId || null,
-        produit_nom:      charge.description || (stripeProductId ? stripeProducts.find((p: any) => p.id === stripeProductId)?.name : null) || 'Paiement Stripe',
-        quantite:         1,
-        prix_unitaire:    (charge.amount || 0) / 100,
-        source:           'stripe',
+        user_id:           userId,
+        produit_id:        produitId || null,
+        produit_nom:       matchingProduct?.name || charge.description || 'Paiement Stripe',
+        quantite:          1,
+        prix_unitaire:     (charge.amount || 0) / 100,
+        source:            'stripe',
         stripe_payment_id: charge.id,
-        date_vente:       new Date(charge.created * 1000).toISOString().split('T')[0],
+        date_vente:        new Date(charge.created * 1000).toISOString().split('T')[0],
       })
       ventesSynced++
     }
@@ -168,8 +197,7 @@ export async function POST(req: NextRequest) {
 
     if (existingConn) {
       await supabaseAdmin.from('connecteurs')
-        .update({ actif: true, derniere_sync: new Date().toISOString() })
-        .eq('id', existingConn.id)
+        .update({ actif: true, derniere_sync: new Date().toISOString() }).eq('id', existingConn.id)
     } else {
       await supabaseAdmin.from('connecteurs')
         .insert({ user_id: userId, type: 'stripe', actif: true, derniere_sync: new Date().toISOString() })
