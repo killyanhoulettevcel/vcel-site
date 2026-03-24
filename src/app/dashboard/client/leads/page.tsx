@@ -412,7 +412,7 @@ export default function LeadsPage() {
                       }`}>
                       <span>{icons[s]}</span> {s}
                     </button>
-                  )})
+                  )})}
                 </div>
               </div>
               <div>
