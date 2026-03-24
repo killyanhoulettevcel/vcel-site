@@ -17,6 +17,8 @@ interface Produit {
   stock: number
   categorie?: string
   source: string
+  type_produit?: string
+  stripe_product_id?: string
   updated_at: string
 }
 
@@ -30,6 +32,14 @@ interface Vente {
   date_vente: string
   source: string
   produits?: { nom: string, categorie: string }
+}
+
+const typeProduitConfig: Record<string, { label: string; color: string }> = {
+  abonnement_mensuel: { label: 'Abo. mensuel',  color: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
+  abonnement_annuel:  { label: 'Abo. annuel',   color: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
+  abonnement:         { label: 'Abonnement',    color: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
+  one_shot:           { label: 'Achat unique',  color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  service:            { label: 'Service',       color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
 }
 
 const sourceColors: Record<string, string> = {
@@ -312,7 +322,14 @@ export default function ProduitsPage() {
                         </span>
                       </td>
                       <td className="py-3 pr-4">
-                        <span className={`text-xs px-2 py-0.5 rounded-lg ${sourceColors[p.source] || sourceColors.manuel}`}>{p.source}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-lg ${sourceColors[p.source] || sourceColors.manuel}`}>{p.source}</span>
+                          {p.type_produit && typeProduitConfig[p.type_produit] && (
+                            <span className={`text-xs px-2 py-0.5 rounded-lg border ${typeProduitConfig[p.type_produit].color}`}>
+                              {typeProduitConfig[p.type_produit].label}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3">
                         <div className="flex items-center gap-1.5">
