@@ -330,7 +330,13 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
 
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function LeadsPage() {
-  const { data: leads, loading, lastUpdate, refresh } = useRealtimeData<Lead>('/api/leads', 'leads')
+  const { data: leadsFromServer, loading, lastUpdate, refresh } = useRealtimeData<Lead>('/api/leads', 'leads')
+  const [localLeads, setLocalLeads] = useState<Lead[]>([])
+
+  // Sync local leads avec server
+  useEffect(() => { setLocalLeads(leadsFromServer) }, [leadsFromServer])
+
+  const leads = localLeads
 
   const [vue,        setVue]        = useState<'kanban' | 'liste'>('kanban')
   const [search,     setSearch]     = useState('')
@@ -385,10 +391,13 @@ export default function LeadsPage() {
   }
 
   const changeStatut = async (id: string, statut: string) => {
-    await fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
-    // Mettre à jour la fiche ouverte si c'est ce lead
+    // Mise à jour optimiste immédiate — pas d'attente API
+    setLocalLeads(prev => prev.map(l => l.id === id ? { ...l, statut: statut as Lead['statut'] } : l))
     if (ficheLead?.id === id) setFicheLead(prev => prev ? { ...prev, statut: statut as Lead['statut'] } : null)
-    refresh()
+    // Appel API en arrière-plan
+    fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
+      .then(r => { if (!r.ok) refresh() }) // Rollback si erreur
+      .catch(() => refresh())
   }
 
   const updateLead = async (id: string, updates: any) => {
@@ -423,12 +432,10 @@ export default function LeadsPage() {
   }
 
   const [isDragging, setIsDragging] = useState(false)
-  const dragMoved = React.useRef(false)
-
-  const onDragStart = (id: string) => { setDragId(id); setIsDragging(true); dragMoved.current = false }
+  const onDragStart = (id: string) => { setDragId(id); setIsDragging(true) }
   const onDragEnd   = () => { setDragId(null); setDragOver(null); setTimeout(() => setIsDragging(false), 50) }
-  const onDrop      = async (statut: string) => {
-    if (dragId) await changeStatut(dragId, statut)
+  const onDrop      = (statut: string) => {
+    if (dragId) changeStatut(dragId, statut) // pas de await — instantané
     setDragId(null); setDragOver(null)
   }
 
@@ -439,7 +446,7 @@ export default function LeadsPage() {
   const caPrevisionnel = leads
     .filter(l => l.statut !== 'perdu')
     .reduce((s, l) => {
-      const prob = l.probabilite || colonnes.find(c => c.id === l.statut)?.prob || 0
+      const prob = l.probabilite ?? colonnes.find(c => c.id === l.statut)?.prob ?? 0
       return s + (l.valeur_estimee || 0) * prob / 100
     }, 0)
 
@@ -509,7 +516,7 @@ export default function LeadsPage() {
             const colLeads = filtered.filter(l => l.statut === col.id)
             const isOver   = dragOver === col.id
             const colCA    = colLeads.reduce((s, l) => {
-              const p = l.probabilite || col.prob
+              const p = l.probabilite ?? col.prob
               return s + (l.valeur_estimee || 0) * p / 100
             }, 0)
 
