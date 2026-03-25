@@ -4,8 +4,9 @@ import {
   Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check,
   Search, RefreshCw, Download, Loader, AlertCircle, LayoutList, Kanban,
   Euro, TrendingUp, PhoneCall, ArrowRight, Activity,
-  ChevronRight, StickyNote, Star, ArrowLeft, Sparkles
+  ChevronRight, StickyNote, Star, ArrowLeft, Sparkles, BarChart2
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
 
@@ -411,6 +412,7 @@ function FicheLead({ lead, onClose, onUpdate, onDelete, onChangeStatut, isMobile
 
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function LeadsPage() {
+  const router = useRouter()
   const { data: leadsFromServer, loading, lastUpdate, refresh } = useRealtimeData<Lead>('/api/leads', 'leads')
   const [localLeads, setLocalLeads] = useState<Lead[]>([])
   useEffect(() => { setLocalLeads(leadsFromServer) }, [leadsFromServer])
@@ -593,6 +595,10 @@ export default function LeadsPage() {
             </button>
           </div>
           <button onClick={refresh} className="btn-ghost py-2 px-2.5"><RefreshCw size={14} /></button>
+          <button onClick={() => router.push('/dashboard/client/leads/analytics')} title="Analytics"
+            className="btn-ghost py-2 px-2.5 hidden sm:flex">
+            <BarChart2 size={14} />
+          </button>
           <button onClick={scoreBulkIA} disabled={scoringBulk} title="Score IA sur tous les leads"
             className="btn-ghost py-2 px-2.5 hidden sm:flex disabled:opacity-40">
             {scoringBulk ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
