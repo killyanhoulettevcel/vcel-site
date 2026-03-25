@@ -186,6 +186,33 @@ function FicheLead({ lead, onClose, onUpdate, onDelete, onChangeStatut, isMobile
           </div>
         </div>
 
+        {/* Score manuel */}
+        <div className="p-4 md:p-6 border-b border-[var(--border)]">
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">🌡️ Score</p>
+          <div className="flex gap-2">
+            {(['chaud', 'tiède', 'froid'] as const).map(s => {
+              const styles = {
+                chaud: { active: 'bg-red-500 border-red-500 text-white',    inactive: 'bg-red-50 border-red-100 text-red-500' },
+                tiède: { active: 'bg-orange-500 border-orange-500 text-white', inactive: 'bg-orange-50 border-orange-100 text-orange-500' },
+                froid: { active: 'bg-blue-500 border-blue-500 text-white',   inactive: 'bg-blue-50 border-blue-100 text-blue-500' },
+              }
+              const icons = { chaud: '🔥', tiède: '➖', froid: '❄️' }
+              return (
+                <button key={s}
+                  onClick={() => {
+                    setCurrentLead(prev => ({ ...prev, score: s }))
+                    onUpdate(lead.id, { score: s })
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                    currentLead.score === s ? styles[s].active : styles[s].inactive
+                  }`}>
+                  <span>{icons[s]}</span> {s}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Infos contact */}
         <div className="p-4 md:p-6 border-b border-[var(--border)]">
           <div className="grid grid-cols-2 gap-3">
