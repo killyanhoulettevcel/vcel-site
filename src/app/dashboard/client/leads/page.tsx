@@ -572,25 +572,31 @@ export default function LeadsPage() {
       {/* Filtres statut mobile */}
       {isMobile && (
         <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-hide">
-          {[{ id: 'tous', label: 'Tous', dot: 'bg-[var(--border-hover)]' }, ...colonnes].map(c => (
-            <button
-              key={c.id}
-              onClick={() => setFiltreStatut(c.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-all ${
-                filtreStatut === c.id
-                  ? 'bg-[var(--navy)] border-[var(--navy)] text-white'
-                  : 'bg-white border-[var(--border)] text-[var(--text-muted)]'
-              }`}
-            >
-              {c.id !== 'tous' && <div className={`w-1.5 h-1.5 rounded-full ${'dot' in c ? c.dot : ''}`} />}
-              {'label' in c ? c.label : c.id}
-              {c.id !== 'tous' && (
-                <span className="bg-black/10 rounded-full px-1.5 py-0.5 text-[10px]">
-                  {leads.filter(l => l.statut === c.id).length}
+          {[{ id: 'tous', label: 'Tous', dot: 'bg-[var(--border-hover)]', color: '', bg: '', prob: 0 }, ...colonnes].map(c => {
+            const isActive = filtreStatut === c.id
+            return (
+              <button
+                key={c.id}
+                onClick={() => setFiltreStatut(c.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-all ${
+                  isActive
+                    ? 'bg-[var(--navy)] border-[var(--navy)]'
+                    : 'bg-white border-[var(--border)]'
+                }`}
+                style={{ color: isActive ? '#ffffff' : undefined }}
+              >
+                {c.id !== 'tous' && <div className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />}
+                <span style={{ color: isActive ? '#ffffff' : undefined }} className={isActive ? '' : c.color || 'text-[var(--text-muted)]'}>
+                  {c.label || c.id}
                 </span>
-              )}
-            </button>
-          ))}
+                {c.id !== 'tous' && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-black/10 text-[var(--text-muted)]'}`}>
+                    {leads.filter(l => l.statut === c.id).length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
 
