@@ -476,6 +476,8 @@ export default function LeadsPage() {
     } catch {}
     setScoringBulk(false)
   }
+
+  const changeStatut = (id: string, statut: string) => {
     setLocalLeads(prev => prev.map(l => l.id === id ? { ...l, statut: statut as Lead['statut'] } : l))
     if (ficheLead?.id === id) setFicheLead(prev => prev ? { ...prev, statut: statut as Lead['statut'] } : null)
     fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
