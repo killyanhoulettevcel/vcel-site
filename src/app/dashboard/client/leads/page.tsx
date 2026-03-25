@@ -4,7 +4,7 @@ import {
   Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check,
   Search, RefreshCw, Download, Loader, AlertCircle, LayoutList, Kanban,
   Euro, TrendingUp, PhoneCall, ArrowRight, Activity,
-  ChevronRight, StickyNote, Star, ArrowLeft
+  ChevronRight, StickyNote, Star, ArrowLeft, Sparkles
 } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
@@ -406,6 +406,9 @@ export default function LeadsPage() {
   const [ficheLead,  setFicheLead]  = useState<Lead | null>(null)
   const [form,       setForm]       = useState(emptyForm)
   const [saving,     setSaving]     = useState(false)
+  const [scoringIA,  setScoringIA]  = useState<string | null>(null) // lead id en cours
+  const [scoringBulk,setScoringBulk]= useState(false)
+  const [scoreResult,setScoreResult]= useState<{id: string; score: string; raison: string; action: string} | null>(null)
   const [dragId,     setDragId]     = useState<string | null>(null)
   const [dragOver,   setDragOver]   = useState<string | null>(null)
 
@@ -451,7 +454,28 @@ export default function LeadsPage() {
     setSaving(false); setShowModal(false); refresh()
   }
 
-  const changeStatut = (id: string, statut: string) => {
+  const scoreLeadIA = async (l: Lead) => {
+    setScoringIA(l.id); setScoreResult(null)
+    try {
+      const res  = await fetch('/api/leads/score-ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: l.id }) })
+      const data = await res.json()
+      if (data.score) {
+        setLocalLeads(prev => prev.map(lead => lead.id === l.id ? { ...lead, score: data.score } : lead))
+        setScoreResult({ id: l.id, ...data })
+      }
+    } catch {}
+    setScoringIA(null)
+  }
+
+  const scoreBulkIA = async () => {
+    setScoringBulk(true)
+    try {
+      const res  = await fetch('/api/leads/score-ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bulk: true }) })
+      const data = await res.json()
+      if (data.scored > 0) refresh()
+    } catch {}
+    setScoringBulk(false)
+  }
     setLocalLeads(prev => prev.map(l => l.id === id ? { ...l, statut: statut as Lead['statut'] } : l))
     if (ficheLead?.id === id) setFicheLead(prev => prev ? { ...prev, statut: statut as Lead['statut'] } : null)
     fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
@@ -535,6 +559,10 @@ export default function LeadsPage() {
             </button>
           </div>
           <button onClick={refresh} className="btn-ghost py-2 px-2.5"><RefreshCw size={14} /></button>
+          <button onClick={scoreBulkIA} disabled={scoringBulk} title="Score IA sur tous les leads"
+            className="btn-ghost py-2 px-2.5 hidden sm:flex disabled:opacity-40">
+            {scoringBulk ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          </button>
           <button onClick={() => exportCSV(leads, 'leads')} className="btn-ghost py-2 px-2.5 hidden sm:flex"><Download size={14} /></button>
           <button onClick={openCreate} className="btn-primary py-2 px-3 text-sm">
             <Plus size={15} /> <span className="hidden sm:inline">Nouveau lead</span><span className="sm:hidden">Nouveau</span>
@@ -676,6 +704,10 @@ export default function LeadsPage() {
                               <span>{relanceOk === l.id ? 'Envoyé' : 'Relancer'}</span>
                             </button>
                           )}
+                          <button onClick={() => scoreLeadIA(l)} disabled={scoringIA === l.id} title="Score IA"
+                            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-40">
+                            {scoringIA === l.id ? <Loader size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                          </button>
                           <button onClick={() => openEdit(l)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-cyan-600 hover:bg-cyan-50 transition-colors"><Pencil size={11} /></button>
                           <button onClick={() => deleteLead(l.id)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={11} /></button>
                         </div>
@@ -737,6 +769,25 @@ export default function LeadsPage() {
             })}
           </div>
         )
+      )}
+
+      {/* Toast résultat Score IA */}
+      {scoreResult && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--navy)] text-white rounded-2xl px-5 py-3 shadow-xl flex items-start gap-3 max-w-sm w-[90vw]">
+          <Sparkles size={16} className="text-violet-300 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold mb-0.5">
+              Score IA : <span className={scoreResult.score === 'chaud' ? 'text-red-300' : scoreResult.score === 'tiède' ? 'text-orange-300' : 'text-blue-300'}>
+                {scoreResult.score === 'chaud' ? '🔥' : scoreResult.score === 'tiède' ? '➖' : '❄️'} {scoreResult.score}
+              </span>
+            </p>
+            <p className="text-white/60 text-xs leading-relaxed">{scoreResult.raison}</p>
+            {scoreResult.action && <p className="text-cyan-300 text-xs mt-1 font-medium">→ {scoreResult.action}</p>}
+          </div>
+          <button onClick={() => setScoreResult(null)} className="text-white/40 hover:text-white shrink-0">
+            <X size={14} />
+          </button>
+        </div>
       )}
 
       {/* Fiche lead */}
