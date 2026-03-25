@@ -100,7 +100,7 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id requis' }, { status: 400 })
 
   // Nettoyer les champs numériques
-  const updates: any = { ...rawUpdates, updated_at: new Date().toISOString() }
+  const updates: any = { ...rawUpdates }
   if (updates.valeur_estimee !== undefined) updates.valeur_estimee = parseFloat(updates.valeur_estimee) || 0
   if (updates.probabilite    !== undefined) updates.probabilite    = parseInt(updates.probabilite)    || 0
 
@@ -108,7 +108,7 @@ export async function PUT(req: NextRequest) {
   // (sera ignoré si la colonne n'existe pas — Supabase renvoie une erreur sinon)
   const safeUpdates: any = {}
   const alwaysAllowed = ['statut', 'score', 'nom', 'email', 'telephone', 'entreprise',
-    'secteur', 'message', 'source', 'date', 'updated_at']
+    'secteur', 'message', 'source', 'date']
   const optionalFields = ['notes', 'valeur_estimee', 'probabilite']
 
   for (const key of alwaysAllowed) {
