@@ -24,6 +24,8 @@ interface Lead {
   date: string
   valeur_estimee: number
   probabilite: number
+  score_ia_raison?: string
+  score_ia_action?: string
   created_at: string
   updated_at: string
 }
@@ -406,9 +408,8 @@ export default function LeadsPage() {
   const [ficheLead,  setFicheLead]  = useState<Lead | null>(null)
   const [form,       setForm]       = useState(emptyForm)
   const [saving,     setSaving]     = useState(false)
-  const [scoringIA,  setScoringIA]  = useState<string | null>(null) // lead id en cours
+  const [scoringIA,  setScoringIA]  = useState<string | null>(null)
   const [scoringBulk,setScoringBulk]= useState(false)
-  const [scoreResult,setScoreResult]= useState<{id: string; score: string; raison: string; action: string} | null>(null)
   const [dragId,     setDragId]     = useState<string | null>(null)
   const [dragOver,   setDragOver]   = useState<string | null>(null)
 
@@ -455,13 +456,17 @@ export default function LeadsPage() {
   }
 
   const scoreLeadIA = async (l: Lead) => {
-    setScoringIA(l.id); setScoreResult(null)
+    setScoringIA(l.id)
     try {
       const res  = await fetch('/api/leads/score-ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: l.id }) })
       const data = await res.json()
       if (data.score) {
-        setLocalLeads(prev => prev.map(lead => lead.id === l.id ? { ...lead, score: data.score } : lead))
-        setScoreResult({ id: l.id, ...data })
+        setLocalLeads(prev => prev.map(lead => lead.id === l.id ? {
+          ...lead,
+          score: data.score,
+          score_ia_raison: data.raison,
+          score_ia_action: data.action,
+        } : lead))
       }
     } catch {}
     setScoringIA(null)
@@ -688,6 +693,9 @@ export default function LeadsPage() {
                           <s.icon size={11} className={`${s.color} shrink-0`} />
                         </div>
                         {l.entreprise && <p className="text-[var(--text-muted)] text-xs truncate mb-1.5">{l.entreprise}</p>}
+                        {l.score_ia_raison && (
+                          <p className="text-[var(--text-light)] text-[10px] leading-snug mb-1.5 italic truncate">✨ {l.score_ia_raison}</p>
+                        )}
                         {l.valeur_estimee > 0 && (
                           <div className="flex items-center gap-1 mb-2">
                             <Euro size={10} className="text-emerald-600" />
@@ -771,25 +779,6 @@ export default function LeadsPage() {
             })}
           </div>
         )
-      )}
-
-      {/* Toast résultat Score IA */}
-      {scoreResult && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--navy)] text-white rounded-2xl px-5 py-3 shadow-xl flex items-start gap-3 max-w-sm w-[90vw]">
-          <Sparkles size={16} className="text-violet-300 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold mb-0.5">
-              Score IA : <span className={scoreResult.score === 'chaud' ? 'text-red-300' : scoreResult.score === 'tiède' ? 'text-orange-300' : 'text-blue-300'}>
-                {scoreResult.score === 'chaud' ? '🔥' : scoreResult.score === 'tiède' ? '➖' : '❄️'} {scoreResult.score}
-              </span>
-            </p>
-            <p className="text-white/60 text-xs leading-relaxed">{scoreResult.raison}</p>
-            {scoreResult.action && <p className="text-cyan-300 text-xs mt-1 font-medium">→ {scoreResult.action}</p>}
-          </div>
-          <button onClick={() => setScoreResult(null)} className="text-white/40 hover:text-white shrink-0">
-            <X size={14} />
-          </button>
-        </div>
       )}
 
       {/* Fiche lead */}

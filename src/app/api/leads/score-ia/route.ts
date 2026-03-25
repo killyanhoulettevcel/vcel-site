@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
   const result = await scoreLead(lead, apiKey)
   if (!result) return NextResponse.json({ error: 'Erreur scoring IA' }, { status: 500 })
 
-  // Sauvegarder le score
+  // Sauvegarder le score + raison
   await supabaseAdmin.from('leads')
-    .update({ score: result.score })
+    .update({ score: result.score, score_ia_raison: result.raison, score_ia_action: result.action })
     .eq('id', leadId).eq('user_id', userId)
 
   // Log activité
