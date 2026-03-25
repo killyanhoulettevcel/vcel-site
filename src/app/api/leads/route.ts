@@ -4,6 +4,10 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { sheetsAppend, sheetsUpsert, getUserSheetId } from '@/lib/googleSheets'
+import {
+  sendEmailFromUser,
+  templateAlertLeadChaud,
+} from '@/lib/googleGmail'
 
 async function syncLeadToSheet(userId: string, lead: any, isUpdate = false) {
   try {
@@ -157,6 +161,40 @@ export async function PUT(req: NextRequest) {
       `Score changé : ${ancien.score} → ${updates.score}`,
       { ancien: ancien.score, nouveau: updates.score }
     )
+
+    // 🔥 Alerte email si le lead passe à "chaud"
+    if (updates.score === 'chaud') {
+      try {
+        const { data: userInfo } = await supabaseAdmin
+          .from('users')
+          .select('nom, email, google_refresh_token, preferences')
+          .eq('id', userId).single()
+
+        // Envoyer seulement si Google connecté et notifications activées
+        if (userInfo?.google_refresh_token && userInfo?.preferences?.notifications_email !== false) {
+          const tpl = templateAlertLeadChaud({
+            nomLead:       data.nom,
+            entreprise:    data.entreprise || undefined,
+            email:         data.email,
+            telephone:     data.telephone || undefined,
+            source:        data.source || undefined,
+            scoreIaRaison: data.score_ia_raison || undefined,
+            scoreIaAction: data.score_ia_action || undefined,
+            nomExpediteur: userInfo.nom || 'VCEL',
+            dashboardUrl:  `${process.env.NEXTAUTH_URL}/dashboard/client/leads`,
+          })
+          await sendEmailFromUser(supabaseAdmin, userId, {
+            to: userInfo.email, subject: tpl.subject, html: tpl.html,
+          })
+          await supabaseAdmin.from('emails_log').insert({
+            user_id: userId, type: 'alerte_lead_chaud',
+            destinataire: userInfo.email, subject: tpl.subject,
+          })
+        }
+      } catch (e) {
+        console.error('[Alerte lead chaud]', e)
+      }
+    }
   }
 
   syncLeadToSheet(userId, data, true)

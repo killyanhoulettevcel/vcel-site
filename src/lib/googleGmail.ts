@@ -152,3 +152,70 @@ export async function sendEmailFromUser(
     html:    options.html,
   })
 }
+
+export function templateAlertLeadChaud(options: {
+  nomLead: string
+  entreprise?: string
+  email: string
+  telephone?: string
+  source?: string
+  scoreIaRaison?: string
+  scoreIaAction?: string
+  nomExpediteur: string
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const subject = `🔥 Lead chaud : ${options.nomLead}`
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+        <tr><td style="background:linear-gradient(135deg,#dc2626,#b91c1c);border-radius:16px 16px 0 0;padding:28px 32px;">
+          <p style="margin:0 0 4px;color:#fca5a5;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Alerte Lead Chaud</p>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">🔥 ${options.nomLead}</h1>
+          ${options.entreprise ? `<p style="margin:6px 0 0;color:#fecaca;font-size:14px;">${options.entreprise}</p>` : ''}
+        </td></tr>
+
+        <tr><td style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+          <p style="margin:0 0 16px;color:#475569;font-size:14px;">Ce lead vient d'être qualifié comme <strong style="color:#dc2626;">chaud</strong>. Contacte-le maintenant pendant que l'intérêt est peak.</p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;padding:16px;border:1px solid #e2e8f0;margin-bottom:16px;">
+            <tr><td>
+              <p style="margin:0 0 8px;color:#64748b;font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Contact</p>
+              <p style="margin:0 0 4px;color:#1e293b;font-size:14px;">📧 ${options.email}</p>
+              ${options.telephone ? `<p style="margin:0 0 4px;color:#1e293b;font-size:14px;">📞 ${options.telephone}</p>` : ''}
+              ${options.source ? `<p style="margin:0;color:#64748b;font-size:12px;">Source : ${options.source}</p>` : ''}
+            </td></tr>
+          </table>
+
+          ${options.scoreIaRaison ? `
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-radius:12px;padding:16px;border:1px solid #fecaca;border-left:4px solid #dc2626;margin-bottom:16px;">
+            <tr><td>
+              <p style="margin:0 0 6px;color:#991b1b;font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:600;">🤖 Analyse IA</p>
+              <p style="margin:0 0 8px;color:#7f1d1d;font-size:13px;">${options.scoreIaRaison}</p>
+              ${options.scoreIaAction ? `<p style="margin:0;color:#dc2626;font-size:13px;font-weight:600;">→ ${options.scoreIaAction}</p>` : ''}
+            </td></tr>
+          </table>
+          ` : ''}
+        </td></tr>
+
+        <tr><td style="background:#ffffff;padding:8px 32px 28px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;text-align:center;">
+          <a href="${options.dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#ffffff;text-decoration:none;padding:12px 32px;border-radius:10px;font-weight:700;font-size:14px;">
+            Voir le lead →
+          </a>
+        </td></tr>
+
+        <tr><td style="background:#f8fafc;border-radius:0 0 16px 16px;padding:16px 32px;text-align:center;border:1px solid #e2e8f0;border-top:none;">
+          <p style="margin:0;color:#94a3b8;font-size:11px;">VCEL · Alerte automatique lead chaud</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+  return { subject, html }
+}
