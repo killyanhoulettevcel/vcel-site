@@ -37,13 +37,15 @@ export async function POST(req: NextRequest) {
           .eq('id', lead.id).eq('user_id', userId)
 
         // Log activité
-        await supabaseAdmin.from('lead_activites').insert({
-          user_id: userId,
-          lead_id: lead.id,
-          type: 'score',
-          contenu: `Score IA : ${result.score} — ${result.raison}`,
-          meta: { ia: true, action: result.action },
-        }).catch(() => {})
+        try {
+          await supabaseAdmin.from('lead_activites').insert({
+            user_id: userId,
+            lead_id: lead.id,
+            type: 'score',
+            contenu: `Score IA : ${result.score} — ${result.raison}`,
+            meta: { ia: true, action: result.action },
+          })
+        } catch {}
 
         scored++
       }
@@ -68,13 +70,15 @@ export async function POST(req: NextRequest) {
     .eq('id', leadId).eq('user_id', userId)
 
   // Log activité
-  await supabaseAdmin.from('lead_activites').insert({
-    user_id: userId,
-    lead_id: leadId,
-    type: 'score',
-    contenu: `Score IA : ${result.score} — ${result.raison}`,
-    meta: { ia: true, action: result.action },
-  }).catch(() => {})
+  try {
+    await supabaseAdmin.from('lead_activites').insert({
+      user_id: userId,
+      lead_id: leadId,
+      type: 'score',
+      contenu: `Score IA : ${result.score} — ${result.raison}`,
+      meta: { ia: true, action: result.action },
+    })
+  } catch {}
 
   return NextResponse.json(result)
 }
