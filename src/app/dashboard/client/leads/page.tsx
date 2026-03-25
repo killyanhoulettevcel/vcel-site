@@ -431,11 +431,11 @@ export default function LeadsPage() {
     setRelancing(null)
   }
 
-  const [isDragging, setIsDragging] = useState(false)
-  const onDragStart = (id: string) => { setDragId(id); setIsDragging(true) }
-  const onDragEnd   = () => { setDragId(null); setDragOver(null); setTimeout(() => setIsDragging(false), 50) }
+  const isDraggingRef = React.useRef(false)
+  const onDragStart = (id: string) => { setDragId(id); isDraggingRef.current = true }
+  const onDragEnd   = () => { setDragId(null); setDragOver(null); isDraggingRef.current = false }
   const onDrop      = (statut: string) => {
-    if (dragId) changeStatut(dragId, statut) // pas de await — instantané
+    if (dragId) changeStatut(dragId, statut)
     setDragId(null); setDragOver(null)
   }
 
@@ -564,7 +564,7 @@ export default function LeadsPage() {
                         draggable
                         onDragStart={(e) => { e.stopPropagation(); onDragStart(l.id) }}
                         onDragEnd={onDragEnd}
-                        onClick={() => { if (!isDragging) setFicheLead(l) }}
+                        onClick={() => { if (!isDraggingRef.current) setFicheLead(l) }}
                         className={`bg-white border border-[var(--border)] rounded-xl p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md hover:border-[var(--border-hover)] transition-all group select-none ${dragId === l.id ? 'opacity-40 rotate-1 scale-95' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
