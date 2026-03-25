@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check,
   Search, RefreshCw, Download, Loader, AlertCircle, LayoutList, Kanban,
@@ -116,8 +116,8 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
   const caPrevu = (parseFloat(valeur) || 0) * ((parseFloat(prob) || col?.prob || 0) / 100)
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-end p-4">
-      <div className="bg-white rounded-2xl border border-[var(--border)] shadow-2xl w-full max-w-xl h-full max-h-[95vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-end p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-[var(--border)] shadow-2xl w-full max-w-xl h-full max-h-[95vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-[var(--border)]">
@@ -423,9 +423,10 @@ export default function LeadsPage() {
   }
 
   const [isDragging, setIsDragging] = useState(false)
+  const dragMoved = React.useRef(false)
 
-  const onDragStart = (id: string) => { setDragId(id); setIsDragging(true) }
-  const onDragEnd   = () => { setDragId(null); setDragOver(null); setTimeout(() => setIsDragging(false), 100) }
+  const onDragStart = (id: string) => { setDragId(id); setIsDragging(true); dragMoved.current = false }
+  const onDragEnd   = () => { setDragId(null); setDragOver(null); setTimeout(() => setIsDragging(false), 50) }
   const onDrop      = async (statut: string) => {
     if (dragId) await changeStatut(dragId, statut)
     setDragId(null); setDragOver(null)
@@ -550,10 +551,10 @@ export default function LeadsPage() {
                       <div
                         key={l.id}
                         draggable
-                        onDragStart={() => onDragStart(l.id)}
+                        onDragStart={(e) => { e.stopPropagation(); onDragStart(l.id) }}
                         onDragEnd={onDragEnd}
                         onClick={() => { if (!isDragging) setFicheLead(l) }}
-                        className={`bg-white border border-[var(--border)] rounded-xl p-3 cursor-pointer shadow-sm hover:shadow-md hover:border-[var(--border-hover)] transition-all group ${dragId === l.id ? 'opacity-40 rotate-1 scale-95' : ''}`}
+                        className={`bg-white border border-[var(--border)] rounded-xl p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md hover:border-[var(--border-hover)] transition-all group select-none ${dragId === l.id ? 'opacity-40 rotate-1 scale-95' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 min-w-0">
