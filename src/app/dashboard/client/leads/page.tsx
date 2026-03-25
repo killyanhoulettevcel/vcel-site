@@ -517,9 +517,13 @@ export default function LeadsPage() {
               <div
                 key={col.id}
                 className={`flex flex-col rounded-2xl border min-w-[240px] w-[240px] shrink-0 transition-all duration-200 ${isOver ? 'ring-2 ring-cyan-400 scale-[1.01]' : ''} ${col.bg}`}
-                onDragOver={e => { e.preventDefault(); setDragOver(col.id) }}
-                onDragLeave={() => setDragOver(null)}
-                onDrop={() => onDrop(col.id)}
+                onDragOver={e => { e.preventDefault(); if (dragOver !== col.id) setDragOver(col.id) }}
+                onDragLeave={e => {
+                  // Ne réinitialiser que si on quitte vraiment la colonne (pas juste un enfant)
+                  const related = e.relatedTarget as Node
+                  if (!e.currentTarget.contains(related)) setDragOver(null)
+                }}
+                onDrop={e => { e.preventDefault(); onDrop(col.id) }}
               >
                 {/* En-tête */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
