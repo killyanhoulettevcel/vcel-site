@@ -169,9 +169,9 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
           {/* Valeur estimée + Probabilité */}
           <div className="p-6 border-b border-[var(--border)]">
             <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">💰 Valeur commerciale</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)]">
-                <p className="text-[var(--text-light)] text-xs mb-1">Valeur estimée</p>
+                <p className="text-[var(--text-light)] text-xs mb-1">Valeur du deal</p>
                 <div className="flex items-center gap-1">
                   <Euro size={12} className="text-[var(--text-muted)]" />
                   <input
@@ -179,26 +179,34 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
                     onChange={e => setValeur(e.target.value)}
                     onBlur={() => saveField('valeur_estimee', parseFloat(valeur) || 0)}
                     placeholder="0"
-                    className="w-full bg-transparent text-[var(--navy)] text-sm font-bold focus:outline-none"
+                    className="w-full bg-transparent text-[var(--navy)] text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               </div>
               <div className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)]">
-                <p className="text-[var(--text-light)] text-xs mb-1">Probabilité</p>
+                <p className="text-[var(--text-light)] text-xs mb-1">Proba. de signature</p>
                 <div className="flex items-center gap-1">
                   <input
                     type="number" value={prob} min={0} max={100}
                     onChange={e => setProb(e.target.value)}
                     onBlur={() => saveField('probabilite', parseInt(prob) || 0)}
                     placeholder={String(col?.prob || 0)}
-                    className="w-full bg-transparent text-[var(--navy)] text-sm font-bold focus:outline-none"
+                    className="w-full bg-transparent text-[var(--navy)] text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-[var(--text-muted)] text-xs">%</span>
+                  <span className="text-[var(--text-muted)] text-xs shrink-0">%</span>
                 </div>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                <p className="text-blue-600 text-xs mb-1">Valeur brute</p>
+                <p className="text-blue-700 text-sm font-bold">{(parseFloat(valeur) || 0).toLocaleString('fr-FR')}€</p>
+                <p className="text-blue-400 text-[10px]">Si le deal se signe</p>
+              </div>
               <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-                <p className="text-emerald-600 text-xs mb-1">CA prévu</p>
+                <p className="text-emerald-600 text-xs mb-1">Valeur pondérée</p>
                 <p className="text-emerald-700 text-sm font-bold">{caPrevu.toLocaleString('fr-FR')}€</p>
+                <p className="text-emerald-400 text-[10px]">Valeur × probabilité</p>
               </div>
             </div>
           </div>
@@ -242,15 +250,21 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
             {/* Ajouter une activité */}
             <div className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)] mb-4">
               <div className="flex gap-2 mb-2">
-                {(['note', 'appel', 'email'] as const).map(t => (
-                  <button key={t} onClick={() => setNewType(t)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all capitalize ${
-                      newType === t ? 'bg-[var(--navy)] border-[var(--navy)] text-white' : 'bg-white border-[var(--border)] text-[var(--text-muted)]'
-                    }`}>
-                    {t === 'note' ? <StickyNote size={10} /> : t === 'appel' ? <PhoneCall size={10} /> : <Mail size={10} />}
-                    {t}
-                  </button>
-                ))}
+                {(['note', 'appel', 'email'] as const).map(t => {
+                    const typeStyles = {
+                      note:  { active: 'bg-blue-500 border-blue-500 text-white',   inactive: 'bg-blue-50 border-blue-100 text-blue-600' },
+                      appel: { active: 'bg-emerald-500 border-emerald-500 text-white', inactive: 'bg-emerald-50 border-emerald-100 text-emerald-600' },
+                      email: { active: 'bg-orange-500 border-orange-500 text-white',  inactive: 'bg-orange-50 border-orange-100 text-orange-600' },
+                    }
+                    const typeIcons = { note: <StickyNote size={10} />, appel: <PhoneCall size={10} />, email: <Mail size={10} /> }
+                    return (
+                    <button key={t} onClick={() => setNewType(t)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all capitalize ${
+                        newType === t ? typeStyles[t].active : typeStyles[t].inactive
+                      }`}>
+                      {typeIcons[t]} {t}
+                    </button>
+                  )})
               </div>
               <div className="flex gap-2">
                 <input
@@ -279,9 +293,10 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
               <div className="space-y-3">
                 {activites.map(act => {
                   const cfg = activiteConfig[act.type] || activiteConfig.note
+                  const isAuto = ['creation', 'statut', 'score'].includes(act.type)
                   return (
-                    <div key={act.id} className="flex items-start gap-3">
-                      <div className={`w-7 h-7 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center justify-center shrink-0 mt-0.5`}>
+                    <div key={act.id} className="flex items-start gap-3 group">
+                      <div className="w-7 h-7 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center justify-center shrink-0 mt-0.5">
                         <cfg.icon size={12} className={cfg.color} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -290,6 +305,17 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
                           {new Date(act.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
+                      {!isAuto && (
+                        <button
+                          onClick={async () => {
+                            await fetch(`/api/lead-activites?id=${act.id}`, { method: 'DELETE' })
+                            setActivites(prev => prev.filter(a => a.id !== act.id))
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-[var(--text-light)] hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -360,6 +386,8 @@ export default function LeadsPage() {
 
   const changeStatut = async (id: string, statut: string) => {
     await fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut }) })
+    // Mettre à jour la fiche ouverte si c'est ce lead
+    if (ficheLead?.id === id) setFicheLead(prev => prev ? { ...prev, statut: statut as Lead['statut'] } : null)
     refresh()
   }
 
@@ -394,8 +422,10 @@ export default function LeadsPage() {
     setRelancing(null)
   }
 
-  const onDragStart = (id: string) => setDragId(id)
-  const onDragEnd   = () => { setDragId(null); setDragOver(null) }
+  const [isDragging, setIsDragging] = useState(false)
+
+  const onDragStart = (id: string) => { setDragId(id); setIsDragging(true) }
+  const onDragEnd   = () => { setDragId(null); setDragOver(null); setTimeout(() => setIsDragging(false), 100) }
   const onDrop      = async (statut: string) => {
     if (dragId) await changeStatut(dragId, statut)
     setDragId(null); setDragOver(null)
@@ -522,7 +552,7 @@ export default function LeadsPage() {
                         draggable
                         onDragStart={() => onDragStart(l.id)}
                         onDragEnd={onDragEnd}
-                        onClick={() => setFicheLead(l)}
+                        onClick={() => { if (!isDragging) setFicheLead(l) }}
                         className={`bg-white border border-[var(--border)] rounded-xl p-3 cursor-pointer shadow-sm hover:shadow-md hover:border-[var(--border-hover)] transition-all group ${dragId === l.id ? 'opacity-40 rotate-1 scale-95' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
