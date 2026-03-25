@@ -264,7 +264,7 @@ function FicheLead({ lead, onClose, onUpdate, onDelete }: {
                       }`}>
                       {typeIcons[t]} {t}
                     </button>
-                  )})
+                  )})}
               </div>
               <div className="flex gap-2">
                 <input
