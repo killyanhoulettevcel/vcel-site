@@ -436,7 +436,7 @@ export default function LeadsPage() {
   const onDragEnd   = () => { setDragId(null); setDragOver(null); isDraggingRef.current = false }
   const onDrop      = (statut: string) => {
     if (dragId) changeStatut(dragId, statut)
-    setDragId(null); setDragOver(null)
+    setDragId(null); setDragOver(null); isDraggingRef.current = false
   }
 
   // Stats
