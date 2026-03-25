@@ -6,9 +6,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Important : ne pas parser le body en JSON, Stripe a besoin du raw body pour la signature
-export const config = { api: { bodyParser: false } }
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
 export async function POST(req: NextRequest) {
