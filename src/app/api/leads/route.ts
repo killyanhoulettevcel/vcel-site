@@ -61,6 +61,28 @@ export async function POST(req: NextRequest) {
   const userId = (session.user as any).id
   const body   = await req.json()
 
+  // ── Détection de doublon ─────────────────────────────────────────────────
+  if (body.email) {
+    const { data: existing } = await supabaseAdmin
+      .from('leads')
+      .select('id, nom, statut, score, created_at')
+      .eq('user_id', userId)
+      .ilike('email', body.email.trim())
+      .limit(1)
+
+    if (existing?.length) {
+      const doublon = existing[0]
+      // Si force=true dans le body, on crée quand même
+      if (!body.force) {
+        return NextResponse.json({
+          doublon: true,
+          lead: doublon,
+          message: `Un lead avec cet email existe déjà (${doublon.nom}, statut : ${doublon.statut})`,
+        }, { status: 409 })
+      }
+    }
+  }
+
   // Champs de base — toujours présents
   const payload: any = {
     user_id:    userId,

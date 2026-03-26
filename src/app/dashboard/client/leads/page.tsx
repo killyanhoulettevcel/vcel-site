@@ -437,6 +437,8 @@ export default function LeadsPage() {
   const [ficheLead,  setFicheLead]  = useState<Lead | null>(null)
   const [form,       setForm]       = useState(emptyForm)
   const [saving,     setSaving]     = useState(false)
+  const [doublon,    setDoublon]    = useState<{id: string; nom: string; statut: string; score: string} | null>(null)
+  const [checkingEmail, setCheckingEmail] = useState(false)
   const [scoringIA,  setScoringIA]  = useState<string | null>(null)
   const [scoringBulk,setScoringBulk]= useState(false)
   const [dragId,     setDragId]     = useState<string | null>(null)
@@ -461,9 +463,9 @@ export default function LeadsPage() {
     return matchSearch && matchStatut
   })
 
-  const openCreate = () => { setEditLead(null); setForm(emptyForm); setShowModal(true) }
+  const openCreate = () => { setEditLead(null); setForm(emptyForm); setDoublon(null); setShowModal(true) }
   const openEdit   = (l: Lead) => {
-    setEditLead(l)
+    setEditLead(l); setDoublon(null)
     setForm({
       nom: l.nom, email: l.email, telephone: l.telephone, entreprise: l.entreprise,
       secteur: l.secteur, message: l.message, notes: l.notes || '', score: l.score,
@@ -473,15 +475,40 @@ export default function LeadsPage() {
     setShowModal(true)
   }
 
-  const handleSave = async () => {
+  const checkEmail = async (email: string) => {
+    if (!email || editLead) return // Pas de vérif en mode édition
+    if (!/\S+@\S+\.\S+/.test(email)) return
+    setCheckingEmail(true)
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, nom: '_check_', force: false }),
+      })
+      if (res.status === 409) {
+        const data = await res.json()
+        setDoublon(data.lead)
+      } else {
+        setDoublon(null)
+      }
+    } catch {}
+    setCheckingEmail(false)
+  }
+
+  const handleSave = async (force = false) => {
     setSaving(true)
     const payload = { ...form, valeur_estimee: parseFloat(form.valeur_estimee) || 0, probabilite: parseInt(form.probabilite) || 0 }
     if (editLead) {
       await fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editLead.id, ...payload }) })
     } else {
-      await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, force }) })
+      if (res.status === 409 && !force) {
+        const data = await res.json()
+        setDoublon(data.lead)
+        setSaving(false)
+        return
+      }
     }
-    setSaving(false); setShowModal(false); refresh()
+    setSaving(false); setShowModal(false); setDoublon(null); refresh()
   }
 
   const scoreLeadIA = async (l: Lead) => {
@@ -879,11 +906,47 @@ export default function LeadsPage() {
                 ].map(f => (
                   <div key={f.key}>
                     <label className="block text-xs text-[var(--text-muted)] mb-1.5 uppercase tracking-wider font-semibold">{f.label}</label>
-                    <input value={(form as any)[f.key]} onChange={e => setForm({...form, [f.key]: e.target.value})}
-                      placeholder={f.placeholder}
-                      className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-[var(--text-primary)] text-sm placeholder:text-[var(--text-light)] focus:outline-none focus:border-cyan-400" />
+                    <div className="relative">
+                      <input
+                        value={(form as any)[f.key]}
+                        onChange={e => {
+                          setForm({...form, [f.key]: e.target.value})
+                          if (f.key === 'email') setDoublon(null)
+                        }}
+                        onBlur={f.key === 'email' && !editLead ? e => checkEmail(e.target.value) : undefined}
+                        placeholder={f.placeholder}
+                        className={`w-full bg-[var(--bg-secondary)] border rounded-xl px-3 py-2.5 text-[var(--text-primary)] text-sm placeholder:text-[var(--text-light)] focus:outline-none transition-colors ${
+                          f.key === 'email' && doublon ? 'border-amber-400 focus:border-amber-400' : 'border-[var(--border)] focus:border-cyan-400'
+                        }`}
+                      />
+                      {f.key === 'email' && checkingEmail && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader size={12} className="animate-spin text-[var(--text-light)]" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Banner doublon */}
+              {doublon && !editLead && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-3">
+                  <AlertCircle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-amber-700 text-xs font-semibold mb-0.5">Lead déjà existant</p>
+                    <p className="text-amber-600 text-xs">
+                      <span className="font-medium">{doublon.nom}</span> — statut : {doublon.statut} · score : {doublon.score}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleSave(true)}
+                    className="shrink-0 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Créer quand même
+                  </button>
+                </div>
+              )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -925,7 +988,7 @@ export default function LeadsPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowModal(false)} className="btn-ghost flex-1 justify-center">Annuler</button>
-              <button onClick={handleSave} disabled={saving || !form.nom || !form.email}
+              <button onClick={() => handleSave(false)} disabled={saving || !form.nom || !form.email}
                 className="btn-primary flex-1 justify-center disabled:opacity-40">
                 {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Check size={15} />{editLead ? 'Modifier' : 'Créer'}</>}
               </button>
