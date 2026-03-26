@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { ArrowRight, Clock, BarChart2, Bot, Sparkles, TrendingUp, Shield, Zap } from 'lucide-react'
+import { ArrowRight, Clock, BarChart2, Bot, Sparkles } from 'lucide-react'
 
 export default function Hero() {
   const ref = useRef<HTMLDivElement>(null)
@@ -22,11 +22,12 @@ export default function Hero() {
   return (
     <section ref={ref} className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-28 pb-20 overflow-hidden" style={{ backgroundColor: '#F5F4F0' }}>
 
-      {/* Fond ambiance */}
+      {/* Fond ambiance — tache cyan chaude centrée */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-[10%] w-[500px] h-[500px] rounded-full bg-cyan-400/10 blur-[80px]" />
-        <div className="absolute bottom-10 left-[5%] w-[400px] h-[400px] rounded-full bg-navy-800/6 blur-[60px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-cyan-300/5 blur-[100px]" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full blur-[120px]"
+          style={{ background: 'radial-gradient(ellipse, rgba(79,195,247,0.18) 0%, transparent 70%)' }} />
+        <div className="absolute top-20 right-[8%] w-[300px] h-[300px] rounded-full blur-[80px]"
+          style={{ background: 'rgba(79,195,247,0.08)' }} />
         <div className="absolute inset-0 opacity-[0.025]"
           style={{
             backgroundImage: 'linear-gradient(var(--navy) 1px, transparent 1px), linear-gradient(90deg, var(--navy) 1px, transparent 1px)',
@@ -44,32 +45,36 @@ export default function Hero() {
           <span className="text-cyan-600 font-bold">Nouveau</span>
         </div>
 
-        {/* Headline */}
+        {/* Headline — très grosse, heatmap principale */}
         <h1 className="fade-in font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-normal leading-[1.0] tracking-tight mb-6 text-[var(--navy)]">
           Pilotez votre business<br />
-          <em className="not-italic text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #4FC3F7 0%, #0288D1 50%, #4FC3F7 100%)' }}>
+          <em className="not-italic text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #4FC3F7 0%, #0288D1 60%)' }}>
             sans effort
           </em>
         </h1>
 
-        <p className="fade-in text-[var(--text-secondary)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-3 font-light">
+        <p className="fade-in text-[var(--text-secondary)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-4 font-light">
           Dashboard financier, CRM leads et coach IA — tout en un, connecté à vos outils, opérationnel en 24h.
         </p>
 
-        {/* Promo code */}
+        {/* Promo code bien visible */}
         <p className="fade-in text-sm text-[var(--text-muted)] mb-10">
-          Code lancement <span className="font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-lg">SOLOFREE</span> — 1er mois offert
+          Code lancement{' '}
+          <span className="font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg mx-1">SOLOFREE</span>
+          — 1er mois offert
         </p>
 
+        {/* CTAs — couleurs explicites */}
         <div className="fade-in flex flex-col sm:flex-row items-center justify-center gap-3 mb-20">
           <a href="#tarifs"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold text-white group transition-all"
-            style={{ background: 'linear-gradient(135deg, #0D1B2A, #1A2E45)', boxShadow: '0 4px 20px rgba(13,27,42,0.25)' }}>
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-bold text-white group transition-all hover:opacity-90 hover:scale-[1.02]"
+            style={{ background: 'linear-gradient(135deg, #0D1B2A 0%, #1e3a5f 100%)', boxShadow: '0 4px 24px rgba(13,27,42,0.30)' }}>
             Commencer gratuitement
             <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
           </a>
           <a href="#demo"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold text-[var(--navy)] bg-white border border-[var(--border)] hover:border-[var(--border-hover)] hover:shadow-md transition-all">
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-sm font-semibold border-2 transition-all hover:scale-[1.02]"
+            style={{ color: '#0D1B2A', borderColor: 'rgba(13,27,42,0.20)', background: 'white' }}>
             Voir la démo
           </a>
         </div>
@@ -81,8 +86,9 @@ export default function Hero() {
             { icon: BarChart2, title: 'Visibilité financière', desc: 'CA, charges, marge en temps réel' },
             { icon: Bot,       title: 'Coach IA',              desc: 'Conseils personnalisés chaque semaine' },
           ].map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="text-left rounded-2xl p-4 bg-white border border-[var(--border)] hover:border-cyan-200 hover:shadow-md transition-all group">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style={{ background: '#0D1B2A' }}>
+            <div key={title} className="text-left rounded-2xl p-4 bg-white border border-[var(--border)] hover:border-cyan-300 hover:shadow-lg transition-all group cursor-default">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+                style={{ background: '#0D1B2A' }}>
                 <Icon size={16} className="text-cyan-400" />
               </div>
               <p className="text-[var(--text-primary)] text-sm font-semibold mb-1">{title}</p>
@@ -92,7 +98,7 @@ export default function Hero() {
         </div>
 
         {/* Stats sociales */}
-        <div className="fade-in flex flex-wrap items-center justify-center gap-6 mt-12 pt-12 border-t border-[var(--border)]">
+        <div className="fade-in flex flex-wrap items-center justify-center gap-8 mt-12 pt-12 border-t border-[var(--border)]">
           {[
             { val: '49€', label: '/mois tout inclus' },
             { val: '24h', label: 'pour être opérationnel' },
@@ -106,8 +112,7 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
         <div className="w-px h-10 bg-gradient-to-b from-[var(--navy)] to-transparent opacity-20" />
       </div>
     </section>
