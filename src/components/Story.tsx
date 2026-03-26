@@ -306,7 +306,7 @@ export default function Story() {
   useEffect(() => {
     if (!isMobile) return
     const track = trackRef.current; if (!track) return
-    const speed = 0.25
+    const speed = 0.5
     const totalWidth = track.scrollWidth / 3
     const animate = () => {
       if (!pausedRef.current) {
