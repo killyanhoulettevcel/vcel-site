@@ -123,7 +123,7 @@ export default function Testimonials() {
 
         {/* Track — dupliqué pour effet infini */}
         <div ref={trackRef} className="flex gap-5 will-change-transform" style={{ width: 'max-content' }}>
-          {[...testimonials, ...testimonials].map((t, i) => (
+          {[...testimonials, ...testimonials, ...testimonials].map((t, i) => (
             <div
               key={i}
               onMouseEnter={() => { pausedRef.current = true }}
