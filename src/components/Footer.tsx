@@ -1,29 +1,5 @@
-import { Instagram, Linkedin, Youtube } from 'lucide-react'
-
-const socials = [
-  {
-    icon: Linkedin,
-    label: 'LinkedIn',
-    href: 'https://www.linkedin.com/in/killyan-houlette-35311b351/',
-    color: '#0A66C2',
-    bg: '#e8f0fe',
-  },
-  {
-    icon: Instagram,
-    label: 'Instagram',
-    href: 'https://www.instagram.com/vcel_votrecommerceenligne/',
-    color: '#E1306C',
-    bg: '#fce4ec',
-  },
-  {
-    icon: Youtube,
-    label: 'TikTok',
-    href: 'https://www.tiktok.com/@vcel_vcel',
-    color: '#000000',
-    bg: '#f5f5f5',
-    tiktok: true,
-  },
-]
+'use client'
+import { Instagram, Linkedin } from 'lucide-react'
 
 // Icône TikTok custom (pas dans lucide)
 function TikTokIcon({ size = 16 }: { size?: number }) {
@@ -56,17 +32,24 @@ export default function Footer() {
 
           {/* Réseaux sociaux */}
           <div className="flex items-center gap-3">
-            {socials.map(s => (
-              <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
-                title={s.label}
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 hover:shadow-md"
-                style={{ background: s.bg, color: s.color }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = s.color; (e.currentTarget as HTMLElement).style.color = '#ffffff' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = s.bg; (e.currentTarget as HTMLElement).style.color = s.color }}
-              >
-                {s.tiktok ? <TikTokIcon size={16} /> : <s.icon size={16} />}
-              </a>
-            ))}
+            <a href="https://www.linkedin.com/in/killyan-houlette-35311b351/" target="_blank" rel="noopener noreferrer"
+              title="LinkedIn"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 hover:shadow-md"
+              style={{ background: '#e8f0fe', color: '#0A66C2' }}>
+              <Linkedin size={16} />
+            </a>
+            <a href="https://www.instagram.com/vcel_votrecommerceenligne/" target="_blank" rel="noopener noreferrer"
+              title="Instagram"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 hover:shadow-md"
+              style={{ background: '#fce4ec', color: '#E1306C' }}>
+              <Instagram size={16} />
+            </a>
+            <a href="https://www.tiktok.com/@vcel_vcel" target="_blank" rel="noopener noreferrer"
+              title="TikTok"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 hover:shadow-md"
+              style={{ background: '#f5f5f5', color: '#000000' }}>
+              <TikTokIcon size={16} />
+            </a>
           </div>
         </div>
 
