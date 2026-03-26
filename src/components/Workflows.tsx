@@ -1,6 +1,7 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { FileText, Bell, BarChart2, PenLine, UserPlus, ScanLine, Landmark, Bot } from 'lucide-react'
+import { useScrollReveal } from '@/lib/useScrollReveal'
 
 const workflows = [
   { num: '01', icon: FileText,  title: 'Dashboard financier',    desc: 'Synchronisation de votre CA, charges et marge depuis Google Sheets. Mise à jour automatique chaque semaine.',  tag: 'Finance',      accent: '#2563eb' },
@@ -14,7 +15,8 @@ const workflows = [
 ]
 
 export default function Workflows() {
-  const trackRef = useRef<HTMLDivElement>(null)
+  const trackRef  = useRef<HTMLDivElement>(null)
+  const sectionRef = useScrollReveal()
   const pausedRef = useRef(false)
   const posRef = useRef(0)
   const rafRef = useRef<number>(0)
@@ -37,13 +39,13 @@ export default function Workflows() {
   }, [])
 
   return (
-    <section id="workflows" className="relative py-16 md:py-24 overflow-hidden" style={{ backgroundColor: '#EFEEE9' }}>
+    <section ref={sectionRef as React.RefObject<HTMLElement>} id="workflows" className="relative py-16 md:py-24 overflow-hidden" style={{ backgroundColor: '#EFEEE9' }}>
       <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'linear-gradient(90deg, #4FC3F7, #0288D1, #4FC3F7)' }} />
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 mb-10 md:mb-12">
-        <p className="text-cyan-600 text-xs md:text-sm font-semibold mb-3 tracking-wide uppercase">Fonctionnalités</p>
+        <p className="reveal text-cyan-600 text-xs md:text-sm font-semibold mb-3 tracking-wide uppercase">Fonctionnalités</p>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <h2 className="font-display text-3xl md:text-5xl text-[var(--navy)] max-w-xl">
+          <h2 className="reveal delay-100 font-display text-3xl md:text-5xl text-[var(--navy)] max-w-xl">
             Tout ce dont vous avez besoin,{' '}
             <em className="not-italic" style={{ color: '#7A90A4' }}>rien de superflu</em>
           </h2>
