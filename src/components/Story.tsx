@@ -344,7 +344,7 @@ export default function Story() {
                 <div className="absolute -inset-5 rounded-3xl pointer-events-none blur-[40px] opacity-25 transition-all duration-1000"
                   style={{ background: `linear-gradient(135deg, ${current.accent}, #0288D1)` }} />
                 <img
-                  src="/killyan.png"
+                  src="/killyanh.png"
                   alt="Killyan Houlette — Fondateur de VCEL"
                   width={380} height={380}
                   className="relative rounded-3xl object-cover shadow-2xl transition-all duration-700"
