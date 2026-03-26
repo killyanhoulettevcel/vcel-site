@@ -11,9 +11,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-cream-100">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto min-w-0">
-        {/* Topbar desktop */}
-        <div className="hidden lg:flex h-14 topbar px-6 items-center justify-end gap-3 shrink-0">
+      {/* overflow-visible sur ce wrapper pour que le panneau notifications ne soit pas coupé */}
+      <div className="flex-1 flex flex-col min-w-0" style={{ overflow: 'visible' }}>
+        {/* Topbar desktop — position sticky pour rester visible au scroll */}
+        <div className="hidden lg:flex h-14 topbar px-6 items-center justify-end gap-3 shrink-0 sticky top-0"
+          style={{ zIndex: 100, overflow: 'visible' }}>
           <Notifications />
           <div className="w-px h-5 bg-[var(--border)]" />
           <a href="/dashboard/client/parametres"
