@@ -62,9 +62,12 @@ function ir(rev: number, parts = 1) {
 
 function simuler(caHT: number, sid: StatutId, charges: number, tauxTVA: number, parts: number, rem: number) {
   const rg = REGIMES.find(r => r.id === sid)!
-  const assujetti = !rg.tvaFranchise || caHT > rg.seuilTVA
+  // Franchise TVA = régime franchise ET sous le seuil. Sinon assujetti.
+  const enFranchise = rg.tvaFranchise && caHT <= rg.seuilTVA
+  const assujetti   = !enFranchise && tauxTVA > 0
   const tvaC = assujetti ? Math.round(caHT * tauxTVA / 100) : 0
-  const tvaD = assujetti ? Math.round(charges * tauxTVA / 100 * .6) : 0
+  // TVA déductible sur charges (AE : pas de charges réelles → 0, ce qui est correct)
+  const tvaD = assujetti && charges > 0 ? Math.round(charges * tauxTVA / 100 * 0.6) : 0
   const tvaN = Math.max(0, tvaC - tvaD)
   const cfe = 750
 
@@ -235,6 +238,7 @@ export default function SimulateurPage() {
   const rg = REGIMES.find(r => r.id === statut)!
   const isAE = statut === 'ae_bnc' || statut === 'ae_bic'
   const isSociete = statut === 'eurl_is' || statut === 'sasu'
+  const enFranchiseTVA = rg.tvaFranchise && caAnnuel <= rg.seuilTVA
   const R = simuler(caAnnuel, statut, charges, tauxTVA, nbParts, remuneration)
 
   // Données graphique
@@ -498,7 +502,7 @@ export default function SimulateurPage() {
                   <span className="badge badge-red flex items-center gap-1">
                     <TrendingDown size={10} /> {fmt(R.urssaf + R.is + R.IR + R.tvaN + R.cfe)} prélevés
                   </span>
-                  {isAE && caAnnuel <= rg.seuilTVA && (
+                  {enFranchiseTVA && (
                     <span className="badge badge-cyan flex items-center gap-1">
                       <Check size={10} /> Franchise TVA
                     </span>
@@ -619,8 +623,8 @@ export default function SimulateurPage() {
             )}
           </div>
 
-          {/* TVA si applicable */}
-          {R.tvaC > 0 && (
+          {/* TVA */}
+          {R.tvaC > 0 ? (
             <div className="card-glass p-5">
               <p className="section-label mb-4">TVA</p>
               <div className="grid grid-cols-3 gap-3">
@@ -635,8 +639,32 @@ export default function SimulateurPage() {
                   </div>
                 ))}
               </div>
+              {isAE && !enFranchiseTVA && (
+                <div className="mt-3 flex items-start gap-2 p-3 rounded-xl text-xs"
+                  style={{ background: 'rgba(249,115,22,0.07)', border: '1px solid rgba(249,115,22,0.20)', color: 'var(--text-secondary)' }}>
+                  <AlertTriangle size={12} className="shrink-0 mt-0.5" style={{ color: '#F97316' }} />
+                  Vous avez dépassé le seuil de franchise TVA ({rg.seuilTVA.toLocaleString('fr-FR')} €).
+                  Vous devez facturer et reverser la TVA depuis le 1er jour de dépassement.
+                </div>
+              )}
             </div>
-          )}
+          ) : enFranchiseTVA ? (
+            <div className="card-glass p-4 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(34,197,94,0.10)' }}>
+                <Check size={13} style={{ color: '#22C55E' }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Franchise en base de TVA</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  CA actuel {fmt(caAnnuel)} &lt; seuil {fmt(rg.seuilTVA)} — vous ne facturez pas de TVA.
+                  {caAnnuel > rg.seuilTVA * 0.85 && (
+                    <span style={{ color: '#F97316' }}> ⚠️ Attention : vous approchez du seuil ({Math.round(caAnnuel / rg.seuilTVA * 100)}%).</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           {/* Conseil IA */}
           <div className="card-glass p-5 relative overflow-hidden">

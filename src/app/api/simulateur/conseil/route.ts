@@ -12,17 +12,27 @@ export async function POST(req: NextRequest) {
 
   const { statut, caAnnuel, charges, result, regime } = await req.json()
 
+  // Compatibilité avec les deux nommages possibles (ancienne + nouvelle version de la page)
+  const urssaf       = result.urssaf ?? 0
+  const ir           = result.IR ?? result.ir ?? 0
+  const is           = result.is ?? 0
+  const net          = result.net ?? result.netApresCharges ?? 0
+  const taux         = result.taux ?? result.tauxPrelevementGlobal ?? 0
+  const tvaN         = result.tvaN ?? result.tvaNette ?? 0
+
   const prompt = `Tu es un expert-comptable français spécialisé dans les TPE et indépendants.
-  
+
 Analyse cette situation fiscale et donne un conseil court et actionnable (3-4 phrases max) :
 
 - Statut juridique : ${regime}
 - CA annuel HT : ${caAnnuel.toLocaleString('fr-FR')} €
-- Charges annuelles : ${charges.toLocaleString('fr-FR')} €
-- URSSAF estimées : ${result.urssaf.toLocaleString('fr-FR')} €
-- IR estimé : ${result.ir.toLocaleString('fr-FR')} €
-- Net perçu estimé : ${result.netApresCharges.toLocaleString('fr-FR')} €
-- Taux de prélèvements global : ${result.tauxPrelevementGlobal}%
+- Charges annuelles : ${(charges || 0).toLocaleString('fr-FR')} €
+- URSSAF estimées : ${urssaf.toLocaleString('fr-FR')} €
+- IS estimé : ${is.toLocaleString('fr-FR')} €
+- IR estimé : ${ir.toLocaleString('fr-FR')} €
+- TVA nette à reverser : ${tvaN.toLocaleString('fr-FR')} €
+- Net perçu estimé : ${net.toLocaleString('fr-FR')} €
+- Taux de prélèvements global : ${taux}%
 
 Donne un conseil concret : est-ce que ce statut est optimisé ? Y a-t-il un seuil critique à surveiller ? Une action simple à faire ?
 Réponds directement sans salutation ni introduction, en français, de manière simple et accessible.`
