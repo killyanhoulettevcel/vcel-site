@@ -76,7 +76,7 @@ export default function Testimonials() {
     if (!track) return
 
     const speed = 0.5 // px par frame
-    const totalWidth = track.scrollWidth / 2 // dupliquer donc /2
+    const totalWidth = track.scrollWidth / 3 // triplé donc /3
 
     const animate = () => {
       if (!pausedRef.current) {
