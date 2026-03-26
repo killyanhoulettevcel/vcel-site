@@ -120,7 +120,7 @@ export default function Hero() {
         </h1>
 
         <p className="fade-in text-[var(--text-secondary)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-4 font-light">
-          Dashboard financier, CRM leads et coach IA — tout en un, connecté à vos outils, opérationnel en 24h.
+          Le logiciel de gestion tout-en-un pour solopreneurs et TPE/PME — dashboard financier, CRM leads et coach IA connectés à Google Sheets. Opérationnel en 24h.
         </p>
 
         {/* Promo code */}

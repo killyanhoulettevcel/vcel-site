@@ -4,32 +4,36 @@ import { Plus, Minus } from 'lucide-react'
 
 const faqs = [
   {
-    q: "Qu'est-ce que VCEL exactement ?",
-    a: "VCEL est un outil SaaS qui connecte vos données business (CA, leads, factures) à un dashboard et un coach IA. Nous configurons les automatisations n8n pour vous — vous n'avez pas à le faire vous-même."
+    q: "Qu'est-ce que VCEL, le logiciel de gestion pour solopreneurs ?",
+    a: "VCEL est un logiciel SaaS tout-en-un conçu pour les solopreneurs et TPE/PME français. Il connecte votre CA, vos leads et vos factures dans un seul dashboard, avec un coach IA personnel qui connaît vos chiffres. La configuration est incluse — vous êtes opérationnel en 24h sans compétences techniques."
   },
   {
-    q: "Faut-il des compétences techniques ?",
-    a: "Non. La configuration est incluse dans l'abonnement. Vous accédez à votre dashboard via un navigateur. Seule la connexion à vos outils Google (Sheets, Gmail) est nécessaire."
+    q: "Faut-il des compétences techniques pour utiliser VCEL ?",
+    a: "Non. La configuration complète est incluse dans l'abonnement. Vous accédez à votre dashboard depuis n'importe quel navigateur. Seule la connexion à vos outils Google (Sheets, Gmail) est nécessaire, et nous vous guidons étape par étape."
   },
   {
-    q: "Combien de temps avant que ça soit opérationnel ?",
-    a: "24 à 48h en général. Après le paiement, vous recevez un email d'activation. On configure votre espace et on vous envoie le lien une fois prêt."
+    q: "Combien de temps avant que le logiciel soit opérationnel ?",
+    a: "24 à 48h en général. Après le paiement, vous recevez un email d'activation. Nous configurons votre espace et vous envoyons le lien d'accès une fois prêt. Certains clients sont opérationnels le jour même."
   },
   {
-    q: "Mes données sont-elles en sécurité ?",
-    a: "Vos données sont stockées sur notre infrastructure sécurisée (Supabase), hébergée en Europe, chiffrée au repos et en transit. Vous restez propriétaire de vos données et pouvez en demander la suppression à tout moment."
+    q: "Comment VCEL synchronise-t-il avec Google Sheets ?",
+    a: "VCEL se connecte à votre Google Sheets via OAuth sécurisé. Vos données CA, leads et factures sont synchronisées automatiquement en temps réel. Vos données restent dans vos propres Google Sheets — VCEL ne fait que les lire et les afficher."
   },
   {
-    q: "Que se passe-t-il si je résilie ?",
-    a: "Vous pouvez résilier à tout moment depuis votre espace client ou en nous contactant. Votre accès est maintenu jusqu'à la fin de la période payée. Vos données Google Sheets restent les vôtres."
+    q: "Mes données sont-elles sécurisées avec VCEL ?",
+    a: "Vos données sont stockées sur Supabase, hébergé en Europe, chiffré au repos et en transit. Vous restez propriétaire de vos données et pouvez en demander la suppression à tout moment. Nous ne revendons jamais vos données."
   },
   {
-    q: "Le coach IA donne des conseils financiers certifiés ?",
-    a: "Non. Le coach IA est un outil d'aide à la décision basé sur vos propres données. Il ne remplace pas un expert-comptable ou un conseiller financier. Pour des décisions importantes, consultez un professionnel."
+    q: "Puis-je résilier mon abonnement à tout moment ?",
+    a: "Oui, sans engagement ni frais. Vous pouvez résilier depuis votre espace client en un clic ou en nous contactant. Votre accès est maintenu jusqu'à la fin de la période payée. Vos données Google Sheets vous appartiennent et restent accessibles."
   },
   {
-    q: "C'est quoi le code SOLOFREE ?",
-    a: "Un code promotionnel de lancement qui offre votre premier mois gratuitement (valeur 49€). Il s'applique directement sur la page de paiement Stripe. Valable sur les abonnements mensuels et annuels. Sans engagement, résiliable avant le 2e mois."
+    q: "Le coach IA remplace-t-il un expert-comptable ?",
+    a: "Non. Le coach IA est un outil d'aide à la décision basé sur vos propres données business. Il vous aide à identifier des opportunités, suivre vos objectifs et prioriser vos actions. Pour des décisions financières importantes, consultez un expert-comptable."
+  },
+  {
+    q: "C'est quoi le code promo SOLOFREE ?",
+    a: "Un code promotionnel de lancement qui offre votre premier mois gratuitement (valeur 49€). Il s'applique directement sur la page de paiement Stripe, sur les abonnements mensuels et annuels. Sans engagement — résiliable avant le 2e mois si vous n'êtes pas satisfait."
   },
 ]
 
@@ -38,10 +42,29 @@ export default function FAQ() {
 
   return (
     <section id="faq" className="relative py-28 px-6">
+      {/* Schema FAQ JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": faqs.map(f => ({
+            "@type": "Question",
+            "name": f.q,
+            "acceptedAnswer": { "@type": "Answer", "text": f.a }
+          }))
+        })}}
+      />
+
       <div className="max-w-3xl mx-auto">
         <div className="mb-14">
           <p className="text-blue-400 text-sm font-semibold mb-3 tracking-wide uppercase">FAQ</p>
-          <h2 className="font-display text-4xl font-bold text-white">Questions fréquentes</h2>
+          <h2 className="font-display text-4xl font-bold text-white">
+            Questions fréquentes sur VCEL
+          </h2>
+          <p className="text-white/50 mt-3 text-sm">
+            Logiciel de gestion pour solopreneurs et TPE/PME — toutes vos réponses
+          </p>
         </div>
         <div className="space-y-2">
           {faqs.map((f, i) => (
@@ -55,9 +78,9 @@ export default function FAQ() {
               onClick={() => setOpen(open === i ? null : i)}
             >
               <div className="flex items-center justify-between p-5 gap-4">
-                <span className={`text-sm font-medium leading-relaxed ${open === i ? 'text-white' : 'text-white/60'}`}>
+                <h3 className={`text-sm font-medium leading-relaxed ${open === i ? 'text-white' : 'text-white/70'}`}>
                   {f.q}
-                </span>
+                </h3>
                 <div className="shrink-0 text-white/40">
                   {open === i ? <Minus size={14} /> : <Plus size={14} />}
                 </div>
