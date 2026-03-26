@@ -4,7 +4,7 @@ import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Users, Activity, Settings, LogOut,
-  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload,
+  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload, Receipt,
   CalendarDays, ShoppingBag, Zap, Menu, X, Bell, HeartPulse
 } from 'lucide-react'
 
@@ -42,6 +42,7 @@ const navGroups = [
       { label: 'Suggestions prix', href: '/dashboard/client/prix',        icon: Euro },
       { label: 'Rentabilité',      href: '/dashboard/client/rentabilite', icon: Calculator },
       { label: 'Objectifs',        href: '/dashboard/client/objectifs',   icon: Target },
+      { label: 'Simulateur fiscal', href: '/dashboard/client/simulateur',   icon: Receipt },
     ]
   },
   {
