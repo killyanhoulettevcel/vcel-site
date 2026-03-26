@@ -18,7 +18,7 @@ export default function Footer() {
         {/* Ligne principale */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="VCEL" className="h-7 w-auto" style={{ mixBlendMode: 'darken' }} />
+            <img src="/logo.png" alt="VCEL" width={28} height={28} className="h-7 w-auto" style={{ mixBlendMode: 'darken' }} />
             <span className="text-xs" style={{ color: '#7A90A4' }}>vcel.fr</span>
           </div>
 

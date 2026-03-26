@@ -68,13 +68,15 @@ function MorphingText() {
 export default function Hero() {
   const ref = useRef<HTMLDivElement>(null)
 
-  // Fade-in séquentiel au chargement
+  // Fade-in séquentiel — le H1 (LCP) reste visible dès le départ
   useEffect(() => {
     const els = ref.current?.querySelectorAll('.fade-in')
     els?.forEach((el, i) => {
       const e = el as HTMLElement
+      // Ne pas masquer le H1 (LCP) — seulement les éléments non-critiques
+      if (e.tagName === 'H1') return
       e.style.opacity = '0'
-      e.style.transform = 'translateY(28px)'
+      e.style.transform = 'translateY(24px)'
       setTimeout(() => {
         e.style.transition = 'opacity 0.8s cubic-bezier(.16,1,.3,1), transform 0.8s cubic-bezier(.16,1,.3,1)'
         e.style.opacity = '1'

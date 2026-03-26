@@ -31,7 +31,10 @@ export default function Navbar() {
               src="/logo.png"
               alt="VCEL"
               className="h-12 w-auto"
+              width={48}
+              height={48}
               style={{ mixBlendMode: 'darken' }}
+              fetchPriority="high"
             />
           </a>
 
