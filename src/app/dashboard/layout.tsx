@@ -11,11 +11,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-cream-100">
       <Sidebar />
-      {/* overflow-visible sur ce wrapper pour que le panneau notifications ne soit pas coupé */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ overflow: 'visible' }}>
-        {/* Topbar desktop — position sticky pour rester visible au scroll */}
-        <div className="hidden lg:flex h-14 topbar px-6 items-center justify-end gap-3 shrink-0 sticky top-0"
-          style={{ zIndex: 100, overflow: 'visible' }}>
+      <div className="flex-1 flex flex-col min-w-0" style={{ overflow: "visible" }}>
+        {/* Topbar desktop */}
+        <div className="hidden lg:flex h-14 topbar px-6 items-center justify-end gap-3 shrink-0 sticky top-0" style={{ zIndex: 100, overflow: "visible" }}>
           <Notifications />
           <div className="w-px h-5 bg-[var(--border)]" />
           <a href="/dashboard/client/parametres"
@@ -26,7 +24,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             <span className="text-xs font-medium text-[var(--text-secondary)]">{nom.split(' ')[0]}</span>
           </a>
         </div>
-        <main className="flex-1 overflow-auto pt-14 lg:pt-0">
+        <main className="flex-1 overflow-auto pt-14 lg:pt-0" style={{ minHeight: 0 }}>
           {children}
         </main>
       </div>

@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
       notifications.push({
         id:      `admin-wf-erreur-${w.id}`,
         type:    'erreur',
-        titre:   `Workflow en panne — ${client?.nom || client?.email || 'Client'}`,
-        message: `${w.nom}${w.erreur_message ? ' : ' + w.erreur_message : ''}`,
+        titre:   `Workflow en panne — ${(client?.nom || client?.email || 'Client').split(' ')[0]}`,
+        message: `${w.nom.length > 30 ? w.nom.slice(0, 30) + '…' : w.nom}${w.erreur_message ? ' · ' + w.erreur_message.slice(0, 40) : ''}`,
         date:    w.updated_at,
         lu:      false,
         href:    '/dashboard/admin',
@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
       notifications.push({
         id:      `admin-wf-inactif-${w.id}`,
         type:    'warning',
-        titre:   `Workflow sans exécution — ${client?.nom || client?.email || 'Client'}`,
-        message: `${w.nom} — aucune exécution depuis 7+ jours`,
+        titre:   `Workflow inactif — ${(client?.nom || client?.email || 'Client').split(' ')[0]}`,
+        message: `${w.nom.length > 30 ? w.nom.slice(0, 30) + '…' : w.nom} · +7 jours sans exécution`,
         date:    w.updated_at || now.toISOString(),
         lu:      false,
         href:    '/dashboard/admin',
