@@ -44,17 +44,20 @@ function transformCA(row: Record<string, string>, userId: string) {
 
 function transformLead(row: Record<string, string>, userId: string) {
   return {
-    user_id:    userId,
-    date:       row.date || new Date().toISOString().split('T')[0],
-    nom:        row.nom || '',
-    email:      row.email || '',
-    telephone:  row.telephone || '',
-    entreprise: row.entreprise || '',
-    secteur:    row.secteur || '',
-    message:    row.message || '',
-    score:      row.score || 'froid',
-    statut:     row.statut || 'nouveau',
-    source:     row.source || '',
+    user_id:        userId,
+    date:           row.date || new Date().toISOString().split('T')[0],
+    nom:            row.nom || '',
+    email:          row.email || '',
+    telephone:      row.telephone || '',
+    entreprise:     row.entreprise || '',
+    secteur:        row.secteur || '',
+    message:        row.message || '',
+    notes:          row.notes || '',
+    score:          row.score || 'froid',
+    statut:         row.statut || 'nouveau',
+    source:         row.source || '',
+    valeur_estimee: parseFloat(row.valeur_estimee) || 0,
+    probabilite:    parseInt(row.probabilite) || 0,
   }
 }
 
@@ -160,11 +163,32 @@ export async function POST(req: NextRequest) {
     let error: any
 
     if (type === 'ca') {
-      // CA a une contrainte unique user_id+mois
       const res = await supabaseAdmin.from(table).upsert(batch, { onConflict: 'user_id,mois', ignoreDuplicates: false })
       error = res.error
+    } else if (type === 'leads') {
+      // Pour les leads : vérifier l'email pour éviter les doublons
+      for (const lead of batch) {
+        if (!lead.email) {
+          const res = await supabaseAdmin.from(table).insert(lead)
+          if (!res.error) inserted++
+          else lastError = res.error.message
+          continue
+        }
+        const { data: existing } = await supabaseAdmin
+          .from('leads').select('id').eq('user_id', userId).ilike('email', lead.email).limit(1)
+        if (existing?.length) {
+          // Mettre à jour le lead existant
+          const res = await supabaseAdmin.from('leads').update(lead).eq('id', existing[0].id)
+          if (!res.error) inserted++
+          else lastError = res.error.message
+        } else {
+          const res = await supabaseAdmin.from(table).insert(lead)
+          if (!res.error) inserted++
+          else lastError = res.error.message
+        }
+      }
+      continue
     } else {
-      // Les autres : insert normal
       const res = await supabaseAdmin.from(table).insert(batch)
       error = res.error
     }
