@@ -1,14 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Users, Activity, Settings, LogOut,
-  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload, Receipt,
-  CalendarDays, ShoppingBag, Zap, Menu, X, Bell, HeartPulse
+  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload, Bell, Receipt,
+  CalendarDays, ShoppingBag, Zap, Menu, X, HeartPulse
 } from 'lucide-react'
 
-interface NavItem { label: string; href: string; icon: React.ElementType; adminOnly?: boolean }
+interface NavItem { label: string; href: string; icon: React.ElementType; adminOnly?: boolean; badge?: boolean }
 
 const navGroups = [
   {
@@ -17,6 +17,7 @@ const navGroups = [
       { label: 'Dashboard',        href: '/dashboard/client',             icon: LayoutDashboard },
       { label: 'Démarrage',        href: '/dashboard/client/onboarding',  icon: Rocket },
       { label: 'Score santé',      href: '/dashboard/client/score',       icon: HeartPulse },
+      { label: 'Alertes IA',        href: '/dashboard/client/alertes',      icon: Bell, badge: true },
     ]
   },
   {
@@ -61,9 +62,17 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const pathname  = usePathname()
   const [open, setOpen] = useState(false)
+  const [nbCritiques, setNbCritiques] = useState(0)
   const role = (session?.user as any)?.role
   const nom  = session?.user?.name || 'Client'
   const email = session?.user?.email || ''
+
+  useEffect(() => {
+    fetch('/api/alertes')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.stats?.critique) setNbCritiques(d.stats.critique) })
+      .catch(() => {})
+  }, [pathname])
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
@@ -113,7 +122,12 @@ export default function Sidebar() {
                   className={`nav-item ${pathname === item.href ? 'active' : ''}`}>
                   <item.icon size={15} />
                   {item.label}
-                  {pathname === item.href && <ChevronRight size={13} className="ml-auto opacity-50" />}
+                  {item.badge && nbCritiques > 0 && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: '#EF4444' }}>
+                      {nbCritiques}
+                    </span>
+                  )}
+                  {!item.badge && pathname === item.href && <ChevronRight size={13} className="ml-auto opacity-50" />}
                 </a>
               ))}
             </div>
