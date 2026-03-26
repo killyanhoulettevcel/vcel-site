@@ -947,7 +947,7 @@ export default function LeadsPage() {
                   </button>
                 </div>
               )}
-              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-[var(--text-muted)] mb-1.5 uppercase tracking-wider font-semibold">Valeur (€)</label>
