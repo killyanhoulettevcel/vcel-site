@@ -4,7 +4,7 @@ import {
   Users, Flame, Minus, Snowflake, Mail, Phone, Plus, Pencil, Trash2, X, Check,
   Search, RefreshCw, Download, Loader, AlertCircle, LayoutList, Kanban,
   Euro, TrendingUp, PhoneCall, ArrowRight, Activity,
-  ChevronRight, StickyNote, Star, ArrowLeft, Sparkles, BarChart2
+  ChevronRight, StickyNote, Star, ArrowLeft, Sparkles, BarChart2, FileText, Receipt
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useRealtimeData } from '@/lib/useRealtimeData'
@@ -154,6 +154,20 @@ function FicheLead({ lead, onClose, onUpdate, onDelete, onChangeStatut, isMobile
         </div>
         {!isMobile && (
           <div className="flex items-center gap-2">
+            <a
+              href={`/dashboard/client/factures/nouvelle?type=proforma&client_nom=${encodeURIComponent(lead.nom)}&client_email=${encodeURIComponent(lead.email || '')}&client_adresse=${encodeURIComponent(lead.entreprise || '')}`}
+              title="Créer un devis pour ce lead"
+              className="p-2 rounded-xl transition-colors hover:bg-[var(--bg-secondary)]"
+              style={{ color: 'var(--cyan-dark)' }}>
+              <Receipt size={15} />
+            </a>
+            <a
+              href={`/dashboard/client/factures/nouvelle?type=facture&client_nom=${encodeURIComponent(lead.nom)}&client_email=${encodeURIComponent(lead.email || '')}&client_adresse=${encodeURIComponent(lead.entreprise || '')}`}
+              title="Créer une facture pour ce lead"
+              className="p-2 rounded-xl transition-colors hover:bg-[var(--bg-secondary)]"
+              style={{ color: 'var(--text-secondary)' }}>
+              <FileText size={15} />
+            </a>
             <button onClick={() => onDelete(lead.id)} className="p-2 rounded-xl text-[var(--text-light)] hover:text-red-500 hover:bg-red-50 transition-colors">
               <Trash2 size={15} />
             </button>
@@ -380,9 +394,21 @@ function FicheLead({ lead, onClose, onUpdate, onDelete, onChangeStatut, isMobile
 
         {/* Actions mobile en bas */}
         {isMobile && (
-          <div className="p-4 border-t border-[var(--border)] flex gap-3">
+          <div className="p-4 border-t border-[var(--border)] space-y-2">
+            <div className="flex gap-2">
+              <a href={`/dashboard/client/factures/nouvelle?type=proforma&client_nom=${encodeURIComponent(lead.nom)}&client_email=${encodeURIComponent(lead.email || '')}`}
+                className="flex items-center justify-center gap-2 flex-1 py-2.5 rounded-xl text-sm font-semibold border"
+                style={{ background: 'rgba(79,195,247,0.08)', borderColor: 'rgba(79,195,247,0.25)', color: 'var(--cyan-dark)' }}>
+                <Receipt size={14} /> Devis
+              </a>
+              <a href={`/dashboard/client/factures/nouvelle?type=facture&client_nom=${encodeURIComponent(lead.nom)}&client_email=${encodeURIComponent(lead.email || '')}`}
+                className="flex items-center justify-center gap-2 flex-1 py-2.5 rounded-xl text-sm font-semibold border"
+                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+                <FileText size={14} /> Facture
+              </a>
+            </div>
             <button onClick={() => onDelete(lead.id)}
-              className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border border-red-100 bg-red-50 text-red-600 text-sm font-semibold">
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-red-100 bg-red-50 text-red-600 text-sm font-semibold">
               <Trash2 size={15} /> Supprimer
             </button>
           </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import {
   Plus, Trash2, Save, ArrowLeft, Check, AlertCircle,
-  ChevronDown, Info, Copy, FileText
+  ChevronDown, Info, Copy, FileText, ShoppingBag
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,6 +42,11 @@ interface FormFacture {
   conditions_paiement:   string
   mentions_legales:      string
   statut:                'payée' | 'en attente' | 'en retard'
+}
+
+interface Produit {
+  id: string; nom: string; prix_vente: number
+  description?: string; categorie?: string
 }
 
 interface Profil {
@@ -103,9 +108,14 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
   const params = useParams()
   const searchParams = useSearchParams()
   const factureId = params?.id as string | undefined
-  const typeParam = (searchParams?.get('type') || 'facture') as FormFacture['type_facture']
+  const typeParam        = (searchParams?.get('type')          || 'facture') as FormFacture['type_facture']
+  const clientNomParam   = searchParams?.get('client_nom')    || ''
+  const clientEmailParam = searchParams?.get('client_email')  || ''
+  const clientAdrParam   = searchParams?.get('client_adresse') || ''
 
   const [profil,   setProfil]   = useState<Profil | null>(null)
+  const [produits, setProduits] = useState<Produit[]>([])
+  const [showProduits, setShowProduits] = useState<string | null>(null)
   const [saving,   setSaving]   = useState(false)
   const [success,  setSuccess]  = useState('')
   const [error,    setError]    = useState('')
@@ -136,10 +146,12 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
   // ── Chargement initial ────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      const [profilRes, facturesRes] = await Promise.all([
+      const [profilRes, facturesRes, produitsRes] = await Promise.all([
         fetch('/api/profil').then(r => r.ok ? r.json() : null),
         fetch('/api/factures').then(r => r.ok ? r.json() : []),
+        fetch('/api/produits').then(r => r.ok ? r.json() : []),
       ])
+      setProduits(Array.isArray(produitsRes) ? produitsRes : [])
       setProfil(profilRes)
       setFactures(Array.isArray(facturesRes) ? facturesRes : [])
 
@@ -147,6 +159,16 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
       const mentions = profilRes?.tva_intracom
         ? `N° TVA intracommunautaire : ${profilRes.tva_intracom}`
         : "TVA non applicable — Article 293B du CGI"
+
+      // Pré-remplir depuis un lead (params URL)
+      if (clientNomParam && !factureId) {
+        setForm(prev => ({
+          ...prev,
+          client_nom:     clientNomParam,
+          client_email:   clientEmailParam,
+          client_adresse: clientAdrParam,
+        }))
+      }
 
       if (factureId) {
         // Mode édition : charger la facture existante
@@ -479,11 +501,40 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
             {form.lignes.map((ligne, i) => (
               <div key={ligne.id} className="grid grid-cols-12 gap-2 items-center p-3 rounded-xl"
                 style={{ background: 'var(--bg-secondary)' }}>
-                <div className="col-span-12 md:col-span-5">
-                  <input value={ligne.description}
-                    onChange={e => updateLigne(ligne.id, 'description', e.target.value)}
-                    placeholder={`Prestation ${i + 1}…`}
-                    className="input-field bg-white text-sm" />
+                <div className="col-span-12 md:col-span-5 relative">
+                  <div className="flex gap-1.5">
+                    <input value={ligne.description}
+                      onChange={e => updateLigne(ligne.id, 'description', e.target.value)}
+                      placeholder={`Prestation ${i + 1}…`}
+                      className="input-field bg-white text-sm flex-1" />
+                    {produits.length > 0 && (
+                      <button type="button"
+                        onClick={() => setShowProduits(showProduits === ligne.id ? null : ligne.id)}
+                        title="Importer un produit"
+                        className="px-2.5 rounded-lg border transition-colors shrink-0"
+                        style={{ borderColor: 'var(--border)', background: showProduits === ligne.id ? 'rgba(79,195,247,0.10)' : 'var(--bg-secondary)', color: showProduits === ligne.id ? 'var(--cyan-dark)' : 'var(--text-muted)' }}>
+                        <ShoppingBag size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {showProduits === ligne.id && (
+                    <div className="absolute top-full left-0 mt-1 w-full rounded-xl border shadow-lg z-20 overflow-auto"
+                      style={{ background: 'white', borderColor: 'var(--border)', maxHeight: 180 }}>
+                      {produits.map(p => (
+                        <button key={p.id} type="button"
+                          onClick={() => {
+                            updateLigne(ligne.id, 'description', p.nom)
+                            updateLigne(ligne.id, 'prix_unitaire', p.prix_vente)
+                            setShowProduits(null)
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-[var(--bg-secondary)] transition-colors border-b last:border-0"
+                          style={{ borderColor: 'var(--border)' }}>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{p.nom}</p>
+                          <p style={{ color: 'var(--text-muted)' }}>{(p.prix_vente || 0).toLocaleString('fr-FR')} € HT{p.categorie ? ` · ${p.categorie}` : ''}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-4 md:col-span-1">
                   <input type="number" min="0" step="0.5" value={ligne.quantite}

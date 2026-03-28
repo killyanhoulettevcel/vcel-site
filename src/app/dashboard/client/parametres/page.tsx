@@ -1,19 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { User, Mail, Lock, Save, Check, AlertCircle, Eye, EyeOff, Crown, Calendar, Zap, Bell, CreditCard, RefreshCw, Plug, ToggleLeft, ToggleRight, ExternalLink, Trash2 } from 'lucide-react'
+import { User, Mail, Lock, Save, Check, AlertCircle, Eye, EyeOff, Crown, Calendar, Zap, Bell, CreditCard, RefreshCw, Plug, ToggleLeft, ToggleRight, ExternalLink, Trash2, FileText, Building2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 
 interface Profil {
-  id: string
-  email: string
-  nom: string
-  secteur: string
-  statut: string
-  role: string
-  created_at: string
-  stripe_customer_id?: string
-  google_access_token?: string
-  preferences?: Preferences
+  id: string; email: string; nom: string; secteur: string; statut: string
+  role: string; created_at: string; stripe_customer_id?: string
+  google_access_token?: string; preferences?: Preferences
+  siret?: string; forme_juridique?: string; adresse?: string
+  code_postal?: string; ville?: string; tva_intracom?: string
+  telephone?: string; site_web?: string; iban?: string
 }
 
 interface Preferences {
@@ -38,6 +34,7 @@ const secteurs = ['Coach / Formateur', 'Freelance', 'E-commerce', 'Immobilier', 
 
 const tabs = [
   { id: 'profil',        label: 'Profil',        icon: User },
+  { id: 'facturation',   label: 'Facturation',   icon: FileText },
   { id: 'integrations',  label: 'Intégrations',  icon: Plug },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'abonnement',    label: 'Abonnement',    icon: CreditCard },
@@ -53,6 +50,10 @@ export default function ParametresPage() {
   const [tab,     setTab]     = useState('profil')
 
   const [formInfo, setFormInfo] = useState({ nom: '', email: '', secteur: '' })
+  const [formFactu, setFormFactu] = useState({
+    siret: '', forme_juridique: '', adresse: '', code_postal: '',
+    ville: '', tva_intracom: '', telephone: '', site_web: '', iban: '',
+  })
   const [formPwd,  setFormPwd]  = useState({ current_password: '', new_password: '', confirm: '' })
   const [showPwd,  setShowPwd]  = useState({ current: false, new: false, confirm: false })
   const [prefs,    setPrefs]    = useState<Preferences>(defaultPrefs)
@@ -66,6 +67,17 @@ export default function ParametresPage() {
       ])
       setProfil(profilRes)
       setFormInfo({ nom: profilRes.nom || '', email: profilRes.email || '', secteur: profilRes.secteur || '' })
+      setFormFactu({
+        siret:           profilRes.siret           || '',
+        forme_juridique: profilRes.forme_juridique || '',
+        adresse:         profilRes.adresse         || '',
+        code_postal:     profilRes.code_postal     || '',
+        ville:           profilRes.ville           || '',
+        tva_intracom:    profilRes.tva_intracom    || '',
+        telephone:       profilRes.telephone       || '',
+        site_web:        profilRes.site_web        || '',
+        iban:            profilRes.iban            || '',
+      })
       setPrefs({ ...defaultPrefs, ...(profilRes.preferences || {}) })
       // Récupérer les connecteurs
       const connRes2 = await fetch('/api/connecteurs').then(r => r.json()).catch(() => [])
@@ -256,6 +268,95 @@ export default function ParametresPage() {
       )}
 
       {/* ── INTÉGRATIONS ─────────────────────────────────────────────────────── */}
+
+      {tab === 'facturation' && (
+        <div className="space-y-5">
+          <div className="card-glass p-5 md:p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 size={15} style={{ color: 'var(--cyan)' }} />
+              <h2 className="font-display font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Informations émetteur</h2>
+            </div>
+            <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>
+              Ces informations apparaîtront automatiquement sur toutes vos factures, devis et avoirs.
+            </p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Forme juridique</label>
+                  <select value={formFactu.forme_juridique} onChange={e => setFormFactu({...formFactu, forme_juridique: e.target.value})} className="input-field">
+                    <option value="">Sélectionner...</option>
+                    {['Auto-entrepreneur', 'EI', 'EURL', 'SARL', 'SASU', 'SAS', 'SA', 'Autre'].map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>SIRET</label>
+                  <input value={formFactu.siret} onChange={e => setFormFactu({...formFactu, siret: e.target.value})} placeholder="123 456 789 00012" className="input-field" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Adresse</label>
+                <input value={formFactu.adresse} onChange={e => setFormFactu({...formFactu, adresse: e.target.value})} placeholder="12 rue de la Paix" className="input-field" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Code postal</label>
+                  <input value={formFactu.code_postal} onChange={e => setFormFactu({...formFactu, code_postal: e.target.value})} placeholder="75001" className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ville</label>
+                  <input value={formFactu.ville} onChange={e => setFormFactu({...formFactu, ville: e.target.value})} placeholder="Paris" className="input-field" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>N° TVA intracommunautaire</label>
+                  <input value={formFactu.tva_intracom} onChange={e => setFormFactu({...formFactu, tva_intracom: e.target.value})} placeholder="FR12345678901 (vide si non assujetti)" className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Téléphone</label>
+                  <input value={formFactu.telephone} onChange={e => setFormFactu({...formFactu, telephone: e.target.value})} placeholder="+33 6 12 34 56 78" className="input-field" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Site web</label>
+                <input value={formFactu.site_web} onChange={e => setFormFactu({...formFactu, site_web: e.target.value})} placeholder="https://monsite.fr" className="input-field" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>IBAN (affiché sur les factures)</label>
+                <input value={formFactu.iban} onChange={e => setFormFactu({...formFactu, iban: e.target.value})} placeholder="FR76 3000 6000 0112 3456 7890 189" className="input-field" />
+              </div>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={async () => {
+                  setSaving(true)
+                  const res = await fetch('/api/profil', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formFactu) })
+                  if (res.ok) showSuccess('Informations de facturation sauvegardées ✓')
+                  else showError('Erreur lors de la sauvegarde')
+                  setSaving(false)
+                }}
+                disabled={saving}
+                className="btn-primary text-sm flex items-center gap-2">
+                {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={14} />}
+                Sauvegarder
+              </button>
+            </div>
+          </div>
+
+          {/* Aperçu */}
+          <div className="card-glass p-5">
+            <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Aperçu mentions légales</h3>
+            <div className="text-xs space-y-1 p-4 rounded-xl" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formInfo.nom}{formFactu.forme_juridique ? ` — ${formFactu.forme_juridique}` : ''}</p>
+              {formFactu.adresse && <p>{formFactu.adresse}, {formFactu.code_postal} {formFactu.ville}</p>}
+              {formFactu.siret ? <p>SIRET : {formFactu.siret}</p> : <p className="italic" style={{ color: '#EF4444' }}>⚠ SIRET non renseigné</p>}
+              {formFactu.tva_intracom ? <p>TVA : {formFactu.tva_intracom}</p> : <p>TVA non applicable — Art. 293B CGI</p>}
+              {formFactu.iban && <p>IBAN : {formFactu.iban}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'integrations' && (
         <div className="space-y-4">
           {/* Google */}
