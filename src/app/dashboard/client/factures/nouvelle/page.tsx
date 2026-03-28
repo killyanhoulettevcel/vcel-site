@@ -112,7 +112,6 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
   const clientNomParam   = searchParams?.get('client_nom')    || ''
   const clientEmailParam = searchParams?.get('client_email')  || ''
   const clientAdrParam   = searchParams?.get('client_adresse') || ''
-  const clientAdrParam   = searchParams?.get('client_adresse') || ''
 
   const [profil,   setProfil]   = useState<Profil | null>(null)
   const [produits,  setProduits]  = useState<any[]>([])
