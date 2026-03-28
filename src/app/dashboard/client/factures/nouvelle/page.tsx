@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import {
   Plus, Trash2, Save, ArrowLeft, Check, AlertCircle,
-  ChevronDown, Info, Copy, FileText
+  ChevronDown, Info, Copy, FileText, ShoppingBag
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
