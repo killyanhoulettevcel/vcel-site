@@ -1,70 +1,284 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Users, Activity, Settings, LogOut,
-  Shield, ChevronRight, Rocket, Brain, Euro, Calculator, Target, Upload, Bell, Receipt,
-  CalendarDays, ShoppingBag, Zap, Menu, X, HeartPulse
+  Shield, ChevronRight, ChevronDown, Rocket, Brain, Euro, Calculator,
+  Target, Upload, Bell, Receipt, CalendarDays, ShoppingBag, Zap,
+  Menu, X, HeartPulse, Landmark, BookTemplate, BarChart2
 } from 'lucide-react'
 
-interface NavItem { label: string; href: string; icon: React.ElementType; adminOnly?: boolean; badge?: boolean }
+// ─── Structure ────────────────────────────────────────────────────────────────
 
-const navGroups = [
+interface NavItem {
+  label: string
+  href: string
+  icon: React.ElementType
+  badge?: boolean
+}
+
+interface NavGroup {
+  id: string
+  label: string
+  icon: React.ElementType   // icône représentant le groupe (affichée quand replié)
+  defaultOpen?: boolean
+  items: NavItem[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
   {
+    id: 'principal',
     label: 'Principal',
+    icon: LayoutDashboard,
+    defaultOpen: true,
     items: [
-      { label: 'Dashboard',        href: '/dashboard/client',             icon: LayoutDashboard },
-      { label: 'Démarrage',        href: '/dashboard/client/onboarding',  icon: Rocket },
-      { label: 'Score santé',      href: '/dashboard/client/score',       icon: HeartPulse },
-      { label: 'Alertes IA',        href: '/dashboard/client/alertes',      icon: Bell, badge: true },
-    ]
+      { label: 'Dashboard',    href: '/dashboard/client',           icon: LayoutDashboard },
+      { label: 'Alertes IA',   href: '/dashboard/client/alertes',   icon: Bell, badge: true },
+      { label: 'Score santé',  href: '/dashboard/client/score',     icon: HeartPulse },
+      { label: 'Démarrage',    href: '/dashboard/client/onboarding', icon: Rocket },
+    ],
   },
   {
+    id: 'facturation',
+    label: 'Facturation',
+    icon: FileText,
+    defaultOpen: false,
+    items: [
+      { label: 'Factures',          href: '/dashboard/client/factures',   icon: FileText },
+      { label: 'Devis',             href: '/dashboard/client/devis',      icon: BookTemplate },
+      { label: 'Avoirs',            href: '/dashboard/client/avoirs',     icon: Landmark },
+      { label: 'Acomptes',          href: '/dashboard/client/acomptes',   icon: Euro },
+      { label: 'Simulateur fiscal', href: '/dashboard/client/simulateur', icon: Receipt },
+    ],
+  },
+  {
+    id: 'finances',
     label: 'Finances',
+    icon: Activity,
+    defaultOpen: false,
     items: [
-      { label: 'CA & Finances',    href: '/dashboard/client/finances',    icon: Activity },
-      { label: 'Factures',         href: '/dashboard/client/factures',    icon: FileText },
-      { label: 'Produits & Ventes',href: '/dashboard/client/produits',    icon: ShoppingBag },
-    ]
+      { label: 'CA & Revenus',      href: '/dashboard/client/finances',    icon: Activity },
+      { label: 'Produits & Ventes', href: '/dashboard/client/produits',    icon: ShoppingBag },
+      { label: 'Rentabilité',       href: '/dashboard/client/rentabilite', icon: BarChart2 },
+    ],
   },
   {
+    id: 'commercial',
     label: 'Commercial',
+    icon: Users,
+    defaultOpen: false,
     items: [
-      { label: 'Leads CRM',        href: '/dashboard/client/leads',       icon: Users },
-      { label: 'Agenda',           href: '/dashboard/client/agenda',      icon: CalendarDays },
-    ]
+      { label: 'Leads CRM', href: '/dashboard/client/leads',  icon: Users },
+      { label: 'Agenda',    href: '/dashboard/client/agenda', icon: CalendarDays },
+    ],
   },
   {
-    label: 'Intelligence',
+    id: 'automatisation',
+    label: 'Automatisation',
+    icon: Zap,
+    defaultOpen: false,
     items: [
       { label: 'Coach IA',         href: '/dashboard/client/coach',       icon: Brain },
       { label: 'Workflows',        href: '/dashboard/client/workflows',   icon: Zap },
-      { label: 'Suggestions prix', href: '/dashboard/client/prix',        icon: Euro },
-      { label: 'Rentabilité',      href: '/dashboard/client/rentabilite', icon: Calculator },
       { label: 'Objectifs',        href: '/dashboard/client/objectifs',   icon: Target },
-      { label: 'Simulateur fiscal', href: '/dashboard/client/simulateur',   icon: Receipt },
-    ]
+      { label: 'Suggestions prix', href: '/dashboard/client/prix',        icon: Euro },
+    ],
   },
   {
+    id: 'outils',
     label: 'Outils',
+    icon: Upload,
+    defaultOpen: false,
     items: [
-      { label: 'Importer CSV',     href: '/dashboard/client/import',      icon: Upload },
-    ]
+      { label: 'Importer CSV', href: '/dashboard/client/import',      icon: Upload },
+      { label: 'Paramètres',   href: '/dashboard/client/parametres',  icon: Settings },
+    ],
   },
 ]
 
-const adminItem = { label: 'Vue globale', href: '/dashboard/admin', icon: Shield }
+const adminItem: NavItem = { label: 'Vue globale', href: '/dashboard/admin', icon: Shield }
 
+// ─── Tooltip flottant ─────────────────────────────────────────────────────────
 
+function GroupTooltip({ group, anchorRef, visible }: {
+  group: NavGroup
+  anchorRef: React.RefObject<HTMLElement>
+  visible: boolean
+}) {
+  const [pos, setPos] = useState({ top: 0 })
+
+  useEffect(() => {
+    if (visible && anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      setPos({ top: rect.top + rect.height / 2 })
+    }
+  }, [visible])
+
+  if (!visible) return null
+
+  return (
+    <div
+      className="fixed z-[9999] pointer-events-none"
+      style={{ left: 264, top: pos.top, transform: 'translateY(-50%)' }}
+    >
+      <div
+        className="rounded-xl shadow-lg py-2 min-w-[160px]"
+        style={{
+          background: 'white',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
+        {/* Flèche */}
+        <div className="absolute left-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 rotate-45"
+          style={{ background: 'white', borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }} />
+
+        <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--text-muted)' }}>
+          {group.label}
+        </p>
+        {group.items.map(item => (
+          <div key={item.href} className="flex items-center gap-2 px-3 py-1.5 text-xs"
+            style={{ color: 'var(--text-secondary)' }}>
+            <item.icon size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            {item.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Groupe dépliant ──────────────────────────────────────────────────────────
+
+function NavGroupItem({
+  group, pathname, nbCritiques, onNavigate,
+}: {
+  group: NavGroup
+  pathname: string
+  nbCritiques: number
+  onNavigate: () => void
+}) {
+  const isActiveGroup = group.items.some(i => pathname.startsWith(i.href) && i.href !== '/dashboard/client' || pathname === i.href)
+  const [open, setOpen] = useState(group.defaultOpen || isActiveGroup)
+  const [tooltipVisible, setTooltipVisible] = useState(false)
+  const headerRef = useRef<HTMLButtonElement>(null)
+
+  // Ouvrir automatiquement si on navigue dans ce groupe
+  useEffect(() => {
+    if (isActiveGroup) setOpen(true)
+  }, [isActiveGroup])
+
+  const GIcon = group.icon
+
+  return (
+    <div>
+      {/* En-tête du groupe */}
+      <button
+        ref={headerRef}
+        onClick={() => setOpen(v => !v)}
+        onMouseEnter={() => !open && setTooltipVisible(true)}
+        onMouseLeave={() => setTooltipVisible(false)}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all group/header"
+        style={{
+          background: isActiveGroup && !open ? 'rgba(79,195,247,0.08)' : 'transparent',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <div className={`w-5 h-5 flex items-center justify-center transition-colors`}>
+            <GIcon size={14} style={{
+              color: isActiveGroup ? 'var(--cyan-dark)' : 'var(--text-muted)',
+            }} />
+          </div>
+          <span
+            className="text-xs font-bold uppercase tracking-wider transition-colors"
+            style={{ color: isActiveGroup ? 'var(--text-primary)' : 'var(--text-muted)' }}
+          >
+            {group.label}
+          </span>
+        </div>
+        <div
+          className="transition-transform duration-200"
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        >
+          <ChevronDown size={12} style={{ color: 'var(--text-light)' }} />
+        </div>
+      </button>
+
+      {/* Tooltip quand replié */}
+      <GroupTooltip
+        group={group}
+        anchorRef={headerRef as React.RefObject<HTMLElement>}
+        visible={tooltipVisible}
+      />
+
+      {/* Items dépliants */}
+      <div
+        className="overflow-hidden transition-all duration-200"
+        style={{
+          maxHeight: open ? `${group.items.length * 44}px` : '0px',
+          opacity: open ? 1 : 0,
+        }}
+      >
+        <div className="mt-0.5 ml-2 pl-3 space-y-0.5 border-l"
+          style={{ borderColor: 'var(--border)' }}>
+          {group.items.map(item => {
+            const isActive = item.href === '/dashboard/client'
+              ? pathname === item.href
+              : pathname.startsWith(item.href)
+
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={{
+                  background: isActive ? 'var(--navy)' : 'transparent',
+                  color: isActive ? 'white' : 'var(--text-secondary)',
+                  boxShadow: isActive ? '0 2px 8px rgba(13,27,42,0.15)' : 'none',
+                }}
+              >
+                <item.icon size={13} style={{
+                  color: isActive ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
+                  flexShrink: 0,
+                }} />
+                <span className="flex-1 truncate">{item.label}</span>
+
+                {/* Badge alertes critiques */}
+                {item.badge && nbCritiques > 0 && (
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white shrink-0"
+                    style={{ background: '#EF4444' }}
+                  >
+                    {nbCritiques}
+                  </span>
+                )}
+
+                {/* Chevron si actif */}
+                {isActive && !item.badge && (
+                  <ChevronRight size={11} style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
+                )}
+              </a>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sidebar principale ───────────────────────────────────────────────────────
 
 export default function Sidebar() {
   const { data: session } = useSession()
   const pathname  = usePathname()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]           = useState(false)
   const [nbCritiques, setNbCritiques] = useState(0)
-  const role = (session?.user as any)?.role
-  const nom  = session?.user?.name || 'Client'
+
+  const role  = (session?.user as any)?.role
+  const nom   = session?.user?.name  || 'Client'
   const email = session?.user?.email || ''
 
   useEffect(() => {
@@ -76,74 +290,87 @@ export default function Sidebar() {
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
+
       {/* Logo */}
-      <div className="px-5 py-5 flex items-center justify-between border-b border-[var(--border)]">
+      <div className="px-5 py-5 flex items-center justify-between border-b"
+        style={{ borderColor: 'var(--border)' }}>
         <a href="/" className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="VCEL" className="h-7 w-auto" style={{ mixBlendMode: 'darken' }}  />
+          <img src="/logo.png" alt="VCEL" className="h-7 w-auto" style={{ mixBlendMode: 'darken' }} />
         </a>
-        <button onClick={() => setOpen(false)} className="lg:hidden text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1">
+        <button onClick={() => setOpen(false)}
+          className="lg:hidden p-1 rounded-lg"
+          style={{ color: 'var(--text-muted)' }}>
           <X size={18} />
         </button>
       </div>
 
       {/* Profil */}
-      <div className="px-4 py-4 border-b border-[var(--border)]">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)]">
-          <div className="w-8 h-8 rounded-full bg-gradient-navy flex items-center justify-center text-white text-sm font-bold shrink-0">
+      <div className="px-4 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+          style={{ background: 'var(--bg-secondary)' }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+            style={{ background: 'var(--navy)' }}>
             {nom.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[var(--text-primary)] text-sm font-semibold truncate">{nom}</p>
-            <p className="text-[var(--text-muted)] text-xs truncate">{email}</p>
+            <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{nom}</p>
+            <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{email}</p>
           </div>
           {role === 'admin' && (
-            <span className="text-xs bg-cyan-100 text-cyan-800 border border-cyan-200 px-1.5 py-0.5 rounded-md font-semibold">Admin</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+              style={{ background: 'rgba(79,195,247,0.15)', color: 'var(--cyan-dark)' }}>
+              Admin
+            </span>
           )}
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
+      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-1">
+
+        {/* Admin */}
         {role === 'admin' && (
-          <div>
-            <a href={adminItem.href} onClick={() => setOpen(false)}
-              className={`nav-item ${pathname === adminItem.href ? 'active' : ''}`}>
-              <adminItem.icon size={15} />
-              {adminItem.label}
-            </a>
-          </div>
+          <a href={adminItem.href} onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium mb-2 transition-all"
+            style={{
+              background: pathname === adminItem.href ? 'var(--navy)' : 'rgba(79,195,247,0.06)',
+              color: pathname === adminItem.href ? 'white' : 'var(--cyan-dark)',
+              border: '1px solid rgba(79,195,247,0.20)',
+            }}>
+            <Shield size={13} />
+            Vue globale
+          </a>
         )}
-        {navGroups.map(group => (
-          <div key={group.label}>
-            <p className="section-label px-3 mb-2">{group.label}</p>
-            <div className="space-y-0.5">
-              {group.items.map(item => (
-                <a key={item.href} href={item.href} onClick={() => setOpen(false)}
-                  className={`nav-item ${pathname === item.href ? 'active' : ''}`}>
-                  <item.icon size={15} />
-                  {item.label}
-                  {item.badge && nbCritiques > 0 && (
-                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: '#EF4444' }}>
-                      {nbCritiques}
-                    </span>
-                  )}
-                  {!item.badge && pathname === item.href && <ChevronRight size={13} className="ml-auto opacity-50" />}
-                </a>
-              ))}
-            </div>
-          </div>
+
+        {/* Groupes */}
+        {NAV_GROUPS.map(group => (
+          <NavGroupItem
+            key={group.id}
+            group={group}
+            pathname={pathname}
+            nbCritiques={nbCritiques}
+            onNavigate={() => setOpen(false)}
+          />
         ))}
       </nav>
 
-      {/* Bas */}
-      <div className="px-3 py-4 border-t border-[var(--border)] space-y-0.5">
-        <a href="/dashboard/client/parametres" onClick={() => setOpen(false)}
-          className={`nav-item ${pathname === '/dashboard/client/parametres' ? 'active' : ''}`}>
-          <Settings size={15} /> Paramètres
-        </a>
-        <button onClick={() => signOut({ callbackUrl: '/' })}
-          className="nav-item w-full text-left hover:!bg-red-50 hover:!text-red-600">
-          <LogOut size={15} /> Déconnexion
+      {/* Déconnexion */}
+      <div className="px-3 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+        <button
+          onClick={() => signOut({ callbackUrl: '/' })}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium w-full transition-all"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = '#FEF2F2'
+            e.currentTarget.style.color = '#DC2626'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--text-muted)'
+          }}
+        >
+          <LogOut size={13} />
+          Déconnexion
         </button>
       </div>
     </div>
@@ -153,10 +380,12 @@ export default function Sidebar() {
     <>
       {/* Topbar mobile */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 topbar flex items-center justify-between px-4">
-        <a href="/" className="flex items-center">
-          <img src="/logo.png" alt="VCEL" className="h-6 w-auto" style={{ mixBlendMode: 'darken' }}  />
+        <a href="/">
+          <img src="/logo.png" alt="VCEL" className="h-6 w-auto" style={{ mixBlendMode: 'darken' }} />
         </a>
-        <button onClick={() => setOpen(true)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1.5 rounded-lg hover:bg-[var(--bg-secondary)]">
+        <button onClick={() => setOpen(true)}
+          className="p-1.5 rounded-lg transition-colors"
+          style={{ color: 'var(--text-secondary)' }}>
           <Menu size={20} />
         </button>
       </div>
@@ -164,14 +393,14 @@ export default function Sidebar() {
       {/* Overlay mobile */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-navy-900/30 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative w-72 max-w-[85vw] sidebar h-full shadow-xl-navy">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="relative w-72 max-w-[85vw] sidebar h-full shadow-xl">
             <NavContent />
           </div>
         </div>
       )}
 
-      {/* Sidebar desktop */}
+      {/* Desktop */}
       <aside className="hidden lg:flex w-64 min-h-screen sidebar flex-col shrink-0">
         <NavContent />
       </aside>
