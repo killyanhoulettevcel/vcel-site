@@ -253,6 +253,12 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
     recalculer(lignes)
   }
 
+  // Mise à jour atomique pour importer un produit (évite l'écrasement par recalculer)
+  const importerProduit = (id: string, nom: string, prix: number) => {
+    const lignes = form.lignes.map(l => l.id === id ? { ...l, description: nom, prix_unitaire: prix } : l)
+    recalculer(lignes)
+  }
+
   const addLigne     = () => recalculer([...form.lignes, newLigne()])
   const removeLigne  = (id: string) => recalculer(form.lignes.filter(l => l.id !== id))
 
@@ -562,8 +568,7 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
                       {produits.map((p: any) => (
                         <button key={p.id} type="button"
                           onClick={() => {
-                            updateLigne(ligne.id, 'description', p.nom)
-                            updateLigne(ligne.id, 'prix_unitaire', p.prix_vente || 0)
+                            importerProduit(ligne.id, p.nom, p.prix_vente || 0)
                             setShowProduits(null)
                           }}
                           className="w-full text-left px-3 py-2.5 text-xs hover:bg-[var(--bg-secondary)] transition-colors border-b last:border-0"
