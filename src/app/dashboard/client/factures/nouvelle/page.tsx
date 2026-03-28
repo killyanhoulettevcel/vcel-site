@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import {
   Plus, Trash2, Save, ArrowLeft, Check, AlertCircle,
-  ChevronDown, Info, Copy, FileText, ShoppingBag
+  ChevronDown, Info, Copy, FileText
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -112,10 +112,13 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
   const clientNomParam   = searchParams?.get('client_nom')    || ''
   const clientEmailParam = searchParams?.get('client_email')  || ''
   const clientAdrParam   = searchParams?.get('client_adresse') || ''
+  const clientAdrParam   = searchParams?.get('client_adresse') || ''
 
   const [profil,   setProfil]   = useState<Profil | null>(null)
-  const [produits, setProduits] = useState<Produit[]>([])
+  const [produits,  setProduits]  = useState<any[]>([])
+  const [leads,     setLeads]     = useState<any[]>([])
   const [showProduits, setShowProduits] = useState<string | null>(null)
+  const [showLeads, setShowLeads]   = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [success,  setSuccess]  = useState('')
   const [error,    setError]    = useState('')
@@ -146,12 +149,14 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
   // ── Chargement initial ────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      const [profilRes, facturesRes, produitsRes] = await Promise.all([
+      const [profilRes, facturesRes, produitsRes, leadsRes] = await Promise.all([
         fetch('/api/profil').then(r => r.ok ? r.json() : null),
         fetch('/api/factures').then(r => r.ok ? r.json() : []),
         fetch('/api/produits').then(r => r.ok ? r.json() : []),
+        fetch('/api/leads').then(r => r.ok ? r.json() : []),
       ])
       setProduits(Array.isArray(produitsRes) ? produitsRes : [])
+      setLeads(Array.isArray(leadsRes) ? leadsRes : [])
       setProfil(profilRes)
       setFactures(Array.isArray(facturesRes) ? facturesRes : [])
 
@@ -160,7 +165,7 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
         ? `N° TVA intracommunautaire : ${profilRes.tva_intracom}`
         : "TVA non applicable — Article 293B du CGI"
 
-      // Pré-remplir depuis un lead (params URL)
+      // Pré-remplir depuis un lead (bouton leads → créer facture)
       if (clientNomParam && !factureId) {
         setForm(prev => ({
           ...prev,
@@ -451,9 +456,44 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <InputField label="Nom / Société" required>
-                  <input value={form.client_nom}
-                    onChange={e => setForm(prev => ({ ...prev, client_nom: e.target.value }))}
-                    placeholder="Jean Dupont" className="input-field" />
+                  <div className="relative">
+                    <div className="flex gap-1.5">
+                      <input value={form.client_nom}
+                        onChange={e => {
+                          setForm(prev => ({ ...prev, client_nom: e.target.value }))
+                          setShowLeads(e.target.value.length >= 2)
+                        }}
+                        onFocus={() => setShowLeads(form.client_nom.length >= 2 || leads.length > 0)}
+                        onBlur={() => setTimeout(() => setShowLeads(false), 200)}
+                        placeholder="Jean Dupont ou sélectionner un lead…"
+                        className="input-field flex-1" />
+                    </div>
+                    {showLeads && leads.length > 0 && (
+                      <div className="absolute top-full left-0 mt-1 w-full rounded-xl border shadow-lg z-20 overflow-auto"
+                        style={{ background: 'white', borderColor: 'var(--border)', maxHeight: 200 }}>
+                        {leads
+                          .filter((l: any) => !form.client_nom || l.nom?.toLowerCase().includes(form.client_nom.toLowerCase()) || l.email?.toLowerCase().includes(form.client_nom.toLowerCase()))
+                          .slice(0, 8)
+                          .map((l: any) => (
+                          <button key={l.id} type="button"
+                            onMouseDown={() => {
+                              setForm(prev => ({
+                                ...prev,
+                                client_nom:     l.nom || '',
+                                client_email:   l.email || '',
+                                client_adresse: l.entreprise || '',
+                              }))
+                              setShowLeads(false)
+                            }}
+                            className="w-full text-left px-3 py-2.5 text-xs hover:bg-[var(--bg-secondary)] transition-colors border-b last:border-0"
+                            style={{ borderColor: 'var(--border)' }}>
+                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{l.nom}</p>
+                            <p style={{ color: 'var(--text-muted)' }}>{l.email}{l.entreprise ? ` · ${l.entreprise}` : ''}{l.score ? ` · ${l.score}` : ''}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </InputField>
                 <InputField label="Email">
                   <input type="email" value={form.client_email}
@@ -520,11 +560,11 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
                   {showProduits === ligne.id && (
                     <div className="absolute top-full left-0 mt-1 w-full rounded-xl border shadow-lg z-20 overflow-auto"
                       style={{ background: 'white', borderColor: 'var(--border)', maxHeight: 180 }}>
-                      {produits.map(p => (
+                      {produits.map((p: any) => (
                         <button key={p.id} type="button"
                           onClick={() => {
                             updateLigne(ligne.id, 'description', p.nom)
-                            updateLigne(ligne.id, 'prix_unitaire', p.prix_vente)
+                            updateLigne(ligne.id, 'prix_unitaire', p.prix_vente || 0)
                             setShowProduits(null)
                           }}
                           className="w-full text-left px-3 py-2.5 text-xs hover:bg-[var(--bg-secondary)] transition-colors border-b last:border-0"

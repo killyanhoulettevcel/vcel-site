@@ -11,7 +11,12 @@ export async function GET(req: NextRequest) {
   const userId = (session.user as any).id
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, email, nom, secteur, statut, role, created_at, stripe_customer_id, google_access_token, preferences')
+    .select(`
+      id, email, nom, secteur, statut, role, created_at,
+      stripe_customer_id, google_access_token, preferences,
+      siret, forme_juridique, adresse, code_postal, ville,
+      tva_intracom, telephone, site_web, iban
+    `)
     .eq('id', userId)
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -25,10 +30,17 @@ export async function PUT(req: NextRequest) {
   const body   = await req.json()
   const updates: any = {}
 
+  // Champs profil de base
   if (body.nom)         updates.nom     = body.nom
   if (body.secteur)     updates.secteur = body.secteur
   if (body.email)       updates.email   = body.email.toLowerCase()
   if (body.preferences) updates.preferences = body.preferences
+
+  // Champs facturation émetteur
+  const factuFields = ['siret', 'forme_juridique', 'adresse', 'code_postal', 'ville', 'tva_intracom', 'telephone', 'site_web', 'iban']
+  for (const field of factuFields) {
+    if (body[field] !== undefined) updates[field] = body[field] || null
+  }
 
   // Déconnexion Google
   if (body.disconnect_google) {
@@ -52,7 +64,7 @@ export async function PUT(req: NextRequest) {
     .from('users')
     .update(updates)
     .eq('id', userId)
-    .select('id, email, nom, secteur, statut, role, preferences')
+    .select('id, email, nom, secteur, statut, role, preferences, siret, forme_juridique, adresse, code_postal, ville, tva_intracom, telephone, site_web, iban')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
