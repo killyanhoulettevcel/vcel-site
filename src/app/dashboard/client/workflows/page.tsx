@@ -17,13 +17,10 @@ interface Workflow {
   nb_executions_jour: number
   nb_executions_semaine: number
   nb_executions_mois: number
-  nb_executions_total: number
   derniere_execution?: string
-  derniere_erreur?: string
   erreur_message?: string
   nb_tentatives_repair?: number
   repair_message?: string
-  seuil_warning_heures?: number
 }
 
 interface WorkflowMeta {
@@ -75,10 +72,10 @@ function getWorkflowMeta(nom: string): WorkflowMeta {
 }
 
 const statutConfig = {
-  ok:      { label: 'Actif',    textColor: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200',   dot: 'bg-emerald-400', icon: CheckCircle },
-  warning: { label: 'Inactif',  textColor: 'text-orange-600',  bg: 'bg-orange-50 border-orange-200',     dot: 'bg-orange-400',  icon: AlertTriangle },
-  erreur:  { label: 'Erreur',   textColor: 'text-red-600',     bg: 'bg-red-50 border-red-200',           dot: 'bg-red-400',     icon: AlertTriangle },
-  inactif: { label: 'Inactif',  textColor: 'text-[var(--text-light)]', bg: 'bg-[var(--bg-secondary)] border-[var(--border)]', dot: 'bg-[var(--border-hover)]', icon: Clock },
+  ok:      { label: 'Actif',         textColor: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200',   dot: 'bg-emerald-400', icon: CheckCircle },
+  warning: { label: 'En maintenance', textColor: 'text-orange-500',  bg: 'bg-orange-50 border-orange-200',     dot: 'bg-orange-400',  icon: Clock },
+  erreur:  { label: 'En maintenance', textColor: 'text-orange-500',  bg: 'bg-orange-50 border-orange-200',     dot: 'bg-orange-400',  icon: Clock },
+  inactif: { label: 'Inactif',        textColor: 'text-[var(--text-light)]', bg: 'bg-[var(--bg-secondary)] border-[var(--border)]', dot: 'bg-[var(--border-hover)]', icon: Clock },
 }
 
 export default function WorkflowsPage() {
@@ -115,10 +112,9 @@ export default function WorkflowsPage() {
 
   const refresh = () => { setRefreshing(true); fetchWorkflows() }
 
-  const actifs   = workflows.filter(w => w.statut === 'ok').length
-  const warnings = workflows.filter(w => w.statut === 'warning').length
-  const erreurs  = workflows.filter(w => w.statut === 'erreur').length
-  const totalEx  = workflows.reduce((s, w) => s + (w.nb_executions_semaine || 0), 0)
+  const actifs  = workflows.filter(w => w.statut === 'ok').length
+  const erreurs = workflows.filter(w => w.statut === 'erreur').length
+  const totalEx = workflows.reduce((s, w) => s + (w.nb_executions_mois || 0), 0)
 
   return (
     <div className="p-4 md:p-8 max-w-3xl">
@@ -152,8 +148,8 @@ export default function WorkflowsPage() {
           </p>
         </div>
         <div className="kpi-card">
-          <p className="text-[var(--text-muted)] text-xs mb-2">Erreurs</p>
-          <p className={`font-display text-2xl md:text-3xl font-bold ${erreurs > 0 ? 'text-red-500' : 'text-[var(--navy)]'}`}>{erreurs}</p>
+          <p className="text-[var(--text-muted)] text-xs mb-2">Maintenance</p>
+          <p className={`font-display text-2xl md:text-3xl font-bold ${erreurs > 0 ? 'text-orange-500' : 'text-[var(--navy)]'}`}>{erreurs}</p>
         </div>
         <div className="kpi-card">
           <p className="text-[var(--text-muted)] text-xs mb-1">Exécutions</p>
@@ -194,7 +190,7 @@ export default function WorkflowsPage() {
             return (
               <div
                 key={w.id}
-                className={`card-glass overflow-hidden transition-all duration-200 ${w.statut === 'erreur' ? 'border-red-200' : w.statut === 'warning' ? 'border-orange-200' : ''}`}
+                className={`card-glass overflow-hidden transition-all duration-200 ${w.statut === 'erreur' || w.statut === 'warning' ? 'border-orange-200' : ''}`}
               >
                 {/* Header cliquable */}
                 <div
@@ -224,10 +220,11 @@ export default function WorkflowsPage() {
                     />
                   </div>
 
-                  {w.erreur_message && (
-                    <div className="mt-3 ml-14 flex items-start gap-2 text-red-600 text-xs bg-red-50 rounded-lg p-2.5 border border-red-100">
-                      <XCircle size={12} className="shrink-0 mt-0.5" />
-                      {w.erreur_message}
+                  {(w.statut === 'erreur' || w.statut === 'warning') && (
+                    <div className="mt-3 ml-14 flex items-start gap-2 text-xs rounded-lg p-2.5 border"
+                      style={{ background: 'rgba(249,115,22,0.07)', borderColor: 'rgba(249,115,22,0.20)', color: '#EA580C' }}>
+                      <Clock size={12} className="shrink-0 mt-0.5" />
+                      Ce workflow est en maintenance. Notre équipe travaille à le rétablir automatiquement.
                     </div>
                   )}
                 </div>
@@ -243,10 +240,10 @@ export default function WorkflowsPage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-3 gap-3">
+                    {(w.statut === 'ok' || w.statut === 'inactif') && <div className="grid grid-cols-3 gap-3">
                       <div className="bg-white rounded-xl p-3 text-center border border-[var(--border)]">
                         <p className="text-[var(--text-muted)] text-xs mb-1">Exécutions</p>
-                        <p className="text-[var(--navy)] font-display font-bold text-lg" title={`Ce mois : ${w.nb_executions_mois || 0}`}>{w.nb_executions_semaine || 0}</p>
+                        <p className="text-[var(--navy)] font-display font-bold text-lg">{w.nb_executions_mois || 0}</p>
                         <p className="text-[var(--text-light)] text-xs">ce mois</p>
                       </div>
                       <div className="bg-white rounded-xl p-3 text-center border border-[var(--border)]">
@@ -261,26 +258,16 @@ export default function WorkflowsPage() {
                             : '—'}
                         </p>
                       </div>
-                    </div>
+                    </div>}
 
                     <div className={`flex items-center gap-2 rounded-xl p-3 border ${s.bg}`}>
                       <StatusIcon size={13} className={s.textColor} />
                       <p className={`text-xs font-medium ${s.textColor}`}>
-                        {w.repair_message && w.statut !== 'ok' && (
-                          <p className="text-xs mt-1 italic" style={{ color: w.statut === 'warning' ? '#EA580C' : '#DC2626' }}>
-                            🤖 {w.repair_message.slice(0, 80)}{w.repair_message.length > 80 ? '…' : ''}
-                          </p>
-                        )}
-                        {w.nb_tentatives_repair != null && w.nb_tentatives_repair > 0 && w.statut !== 'ok' && (
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Tentatives IA : {w.nb_tentatives_repair}/3
-                          </p>
-                        )}
                         {w.statut === 'ok'
-                          ? 'Ce workflow tourne normalement. Aucune intervention requise.'
-                          : w.statut === 'erreur'
-                          ? 'Une erreur a été détectée lors de la dernière exécution. Vérifiez la connexion n8n.'
-                          : 'Ce workflow est en pause. Contactez le support pour le réactiver.'}
+                          ? 'Ce workflow tourne normalement. Aucune action requise de votre part.'
+                          : w.statut === 'warning' || w.statut === 'erreur'
+                          ? 'Ce workflow est temporairement en maintenance. Notre équipe intervient automatiquement — aucune action requise de votre part.'
+                          : 'Ce workflow est inactif. Contactez le support si besoin.'}
                       </p>
                     </div>
                   </div>
