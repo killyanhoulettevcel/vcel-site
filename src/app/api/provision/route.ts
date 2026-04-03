@@ -44,6 +44,9 @@ async function createWorkflowCA(userId: string, sheetId: string, clientNom: stri
   const workflow = JSON.parse(wfStr)
   delete workflow.id
   delete workflow.active
+  delete workflow.versionId
+  delete workflow.meta
+  delete workflow.tags
   workflow.name = `VCEL-2 — CA Sheets → Supabase [${clientNom}]`
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
@@ -63,6 +66,9 @@ async function createWorkflowResume(userId: string, clientNom: string, clientEma
   const workflow = JSON.parse(wfStr)
   delete workflow.id
   delete workflow.active
+  delete workflow.versionId
+  delete workflow.meta
+  delete workflow.tags
   workflow.name = `VCEL-3 — Résumé Hebdo IA [${clientEmail}]`
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
