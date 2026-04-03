@@ -42,6 +42,7 @@ async function createWorkflowCA(userId: string, sheetId: string, clientNom: stri
     .replace(/SUPABASE_KEY_PLACEHOLDER/g, supabaseKey)
     .replace(/PROVISIONING_SECRET_PLACEHOLDER_REPLACE/g, process.env.PROVISIONING_SECRET!)
   const workflow = JSON.parse(wfStr)
+  delete workflow.id
   workflow.name = `VCEL-2 — CA Sheets → Supabase [${clientNom}]`
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
@@ -59,6 +60,7 @@ async function createWorkflowResume(userId: string, clientNom: string, clientEma
     .replace(/CLIENT_EMAIL_PLACEHOLDER/g, clientEmail)
     .replace(/PROVISION_SECRET_PLACEHOLDER/g, provisionSecret)
   const workflow = JSON.parse(wfStr)
+  delete workflow.id
   workflow.name = `VCEL-3 — Résumé Hebdo IA [${clientEmail}]`
   const res  = await n8nFetch('/workflows', { method: 'POST', body: JSON.stringify(workflow) })
   const data = await res.json()
