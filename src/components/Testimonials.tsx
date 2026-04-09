@@ -49,8 +49,8 @@ const testimonials = [
     initiale: 'P',
     color: 'bg-amber-100 text-amber-700',
     etoiles: 5,
-    texte: "Pour 49€/mois j'ai l'équivalent d'un assistant administratif. La synchronisation avec Google Sheets fonctionne parfaitement — mes données restent là où je les veux.",
-    highlight: 'ROI immédiat à 49€/mois',
+    texte: "Pour 39€/mois j'ai l'équivalent d'un assistant administratif. La synchronisation avec Google Sheets fonctionne parfaitement — mes données restent là où je les veux.",
+    highlight: 'ROI immédiat à 39€/mois',
     highlightColor: 'bg-amber-50 border-amber-200 text-amber-700',
   },
   {

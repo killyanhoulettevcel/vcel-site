@@ -96,7 +96,7 @@ export default function ObjectifsPage() {
   }
 
   return (
-    <PlanGate feature="objectifs">
+    <PlanGate feature="workflows">
     <div className="p-4 md:p-8 max-w-2xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
