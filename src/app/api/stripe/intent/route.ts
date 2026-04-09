@@ -4,17 +4,35 @@ import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
-const PRICES = {
-  monthly: { priceId: 'price_1T1QK42fhxDJntt9VCBc77Gs', label: 'Mensuel 49€/mois' },
-  annual:  { priceId: 'price_1TABiy2fhxDJntt99715Z9e4', label: 'Annuel 468€/an' },
+const PRICES: Record<string, Record<string, string>> = {
+  starter: {
+    monthly: 'price_1TKDU32fhxDJntt9gQReMoQ0',
+    annual:  'price_1TKDUd2fhxDJntt9TasRT1qZ',
+  },
+  pro: {
+    monthly: 'price_1TKDVC2fhxDJntt9syXt9Eml',
+    annual:  'price_1TKDVb2fhxDJntt95GeQqJaA',
+  },
+  business: {
+    monthly: 'price_1TKDZ02fhxDJntt9s85YSysI',
+    annual:  'price_1TKDZS2fhxDJntt92RhD0X8s',
+  },
 }
 
-const SOLOFREE_PROMOTION_ID = 'promo_1TBZgJ2fhxDJntt9XdwyvgaH'
+// Trial 14j sur Starter et Pro mensuel uniquement
+const TRIAL_PLANS = ['starter_monthly', 'pro_monthly']
 
 export async function POST(req: NextRequest) {
-  const { plan, email, coupon } = await req.json()
-  const planData = PRICES[plan as keyof typeof PRICES] || PRICES.monthly
-  const isSolofree = coupon?.toUpperCase() === 'SOLOFREE'
+  const { plan, billing, email } = await req.json()
+  // plan    : 'starter' | 'pro' | 'business'
+  // billing : 'monthly' | 'annual'
+
+  const priceId = PRICES[plan]?.[billing]
+  if (!priceId) {
+    return NextResponse.json({ error: 'Plan invalide' }, { status: 400 })
+  }
+
+  const hasTrial = TRIAL_PLANS.includes(`${plan}_${billing}`)
 
   try {
     // Créer ou récupérer le customer
@@ -23,18 +41,18 @@ export async function POST(req: NextRequest) {
       const existing = await stripe.customers.list({ email, limit: 1 })
       customerId = existing.data.length > 0
         ? existing.data[0].id
-        : (await stripe.customers.create({ email })).id
+        : (await stripe.customers.create({ email, metadata: { source: 'vcel_site' } })).id
     }
 
-    // Même flow pour mensuel ET annuel : SetupIntent → confirm → subscription
+    // SetupIntent — la CB est enregistrée, la subscription sera créée dans /confirm
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       usage: 'off_session',
       metadata: {
         plan,
-        priceId: planData.priceId,
-        coupon: coupon || '',
-        promotionId: isSolofree ? SOLOFREE_PROMOTION_ID : '',
+        billing,
+        priceId,
+        trial: hasTrial ? '14' : '0',
         source: 'vcel_site',
       },
       automatic_payment_methods: { enabled: true },
@@ -44,6 +62,7 @@ export async function POST(req: NextRequest) {
       clientSecret: setupIntent.client_secret,
       type: 'setup',
       customerId,
+      hasTrial,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
