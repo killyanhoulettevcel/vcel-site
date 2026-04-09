@@ -88,8 +88,14 @@ export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-provision-secret')
   if (secret !== SECRET) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
-  const { userId, email, nom } = await req.json()
+  const { userId, email, nom, plan } = await req.json()
   if (!userId || !email) return NextResponse.json({ error: 'userId et email requis' }, { status: 400 })
+
+  // Fonctionnalités selon le plan
+  // Starter : Google Sheet uniquement (pas de workflows n8n)
+  // Pro / Business : Google Sheet + VCEL-2 (CA) + VCEL-3 (Résumé IA)
+  const needsWorkflows = plan === 'pro' || plan === 'business'
+  console.log(`[PROVISION] Plan: ${plan} — workflows: ${needsWorkflows}`)
 
   console.log(`[PROVISION] Démarrage pour ${email} (${userId})`)
 
@@ -104,49 +110,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Étape 1 (Google Sheets): ' + e.message, step: 1 }, { status: 500 })
   }
 
-  // Étape 2 : VCEL-2
+  // Étape 2 : VCEL-2 (Pro/Business uniquement)
   let wf2Id = ''
-  try {
-    console.log('[PROVISION] Étape 2: VCEL-2...')
-    wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
-    console.log('[PROVISION] VCEL-2 OK:', wf2Id)
-  } catch (e: any) {
-    console.error('[PROVISION] Erreur étape 2:', e.message)
-    return NextResponse.json({ error: 'Étape 2 (VCEL-2): ' + e.message, step: 2, sheetId }, { status: 500 })
+  if (needsWorkflows) {
+    try {
+      console.log('[PROVISION] Étape 2: VCEL-2...')
+      wf2Id = await createWorkflowCA(userId, sheetId, nom || email)
+      console.log('[PROVISION] VCEL-2 OK:', wf2Id)
+    } catch (e: any) {
+      console.error('[PROVISION] Erreur étape 2:', e.message)
+      return NextResponse.json({ error: 'Étape 2 (VCEL-2): ' + e.message, step: 2, sheetId }, { status: 500 })
+    }
+  } else {
+    console.log('[PROVISION] Étape 2 ignorée — plan Starter')
   }
 
-  // Étape 3 : VCEL-3
+  // Étape 3 : VCEL-3 (Pro/Business uniquement)
   let wf3Id = ''
-  try {
-    console.log('[PROVISION] Étape 3: VCEL-3...')
-    wf3Id = await createWorkflowResume(userId, nom || email, email)
-    console.log('[PROVISION] VCEL-3 OK:', wf3Id)
-  } catch (e: any) {
-    console.error('[PROVISION] Erreur étape 3:', e.message)
-    return NextResponse.json({ error: 'Étape 3 (VCEL-3): ' + e.message, step: 3, sheetId, wf2Id }, { status: 500 })
+  if (needsWorkflows) {
+    try {
+      console.log('[PROVISION] Étape 3: VCEL-3...')
+      wf3Id = await createWorkflowResume(userId, nom || email, email)
+      console.log('[PROVISION] VCEL-3 OK:', wf3Id)
+    } catch (e: any) {
+      console.error('[PROVISION] Erreur étape 3:', e.message)
+      return NextResponse.json({ error: 'Étape 3 (VCEL-3): ' + e.message, step: 3, sheetId, wf2Id }, { status: 500 })
+    }
+  } else {
+    console.log('[PROVISION] Étape 3 ignorée — plan Starter')
   }
 
   // Étape 4 : Supabase
   try {
     const { error: updateError } = await supabaseAdmin.from('users').update({
-      n8n_workflow_ca_id:     wf2Id,
-      n8n_workflow_resume_id: wf3Id,
+      n8n_workflow_ca_id:     wf2Id     || null,
+      n8n_workflow_resume_id: wf3Id     || null,
       google_sheet_id:        sheetId,
+      plan:                   plan      || 'starter',
       provisionne:            true,
       provisionne_at:         new Date().toISOString(),
     }).eq('id', userId)
 
     if (updateError) console.error('[PROVISION] Update error:', updateError.message)
 
-    await supabaseAdmin.from('workflows').insert([
-      { user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',   actif: true, statut: 'ok', nb_executions_mois: 0 },
-      { user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA', actif: true, statut: 'ok', nb_executions_mois: 0 },
-    ])
+    if (needsWorkflows && wf2Id && wf3Id) {
+      await supabaseAdmin.from('workflows').insert([
+        { user_id: userId, workflow_id: wf2Id, nom: 'CA Sheets → Supabase',   actif: true, statut: 'ok', nb_executions_mois: 0 },
+        { user_id: userId, workflow_id: wf3Id, nom: 'Résumé hebdomadaire IA', actif: true, statut: 'ok', nb_executions_mois: 0 },
+      ])
+    }
     console.log('[PROVISION] ✅ Terminé pour', email)
   } catch (e: any) {
     console.error('[PROVISION] Erreur étape 4:', e.message)
     return NextResponse.json({ error: 'Étape 4 (Supabase): ' + e.message, step: 4 }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, sheetId, wf2Id, wf3Id, message: `Environnement créé pour ${email}` })
+  return NextResponse.json({ success: true, sheetId, wf2Id: wf2Id || null, wf3Id: wf3Id || null, plan: plan || 'starter', message: `Environnement ${plan || 'starter'} créé pour ${email}` })
 }
