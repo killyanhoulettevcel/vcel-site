@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'VCEL — Logiciel de gestion pour solopreneurs et TPE/PME | Dashboard IA',
-  description: 'VCEL automatise votre gestion d\'entreprise : dashboard financier, CRM leads avec score IA, gestion des factures et coach IA personnel. Opérationnel en 24h. 49€/mois sans engagement.',
+  description: 'VCEL automatise votre gestion d\'entreprise : dashboard financier, CRM leads avec score IA, gestion des factures et coach IA personnel. Dès 19€/mois · 14 jours gratuits · sans engagement.',
   metadataBase: new URL('https://vcel.fr'),
   keywords: [
     'logiciel gestion solopreneur',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     url: 'https://vcel.fr',
     siteName: 'VCEL',
     title: 'VCEL — Logiciel de gestion pour solopreneurs | Dashboard + CRM + Coach IA',
-    description: 'Automatisez votre gestion d\'entreprise avec VCEL. Dashboard financier, CRM leads avec score IA, gestion des factures. Tout en un, connecté à Google Sheets. 49€/mois.',
+    description: 'Automatisez votre gestion d\'entreprise avec VCEL. Dashboard financier, CRM leads avec score IA, gestion des factures. Tout en un, connecté à Google Sheets. Dès 19€/mois.',
     images: [{
       url: '/logo.png',
       width: 400,
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'VCEL — Logiciel de gestion pour solopreneurs',
-    description: 'Dashboard financier, CRM leads IA, gestion factures. Tout en un. 49€/mois.',
+    description: 'Dashboard financier, CRM leads IA, gestion factures. Tout en un. Dès 19€/mois.',
     images: ['/logo.png'],
   },
 }
@@ -83,15 +83,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             "applicationCategory": "BusinessApplication",
             "operatingSystem": "Web",
             "offers": {
-              "@type": "Offer",
-              "price": "49",
+              "@type": "AggregateOffer",
+              "lowPrice": "19",
+              "highPrice": "69",
               "priceCurrency": "EUR",
-              "priceSpecification": {
-                "@type": "UnitPriceSpecification",
-                "price": "49",
-                "priceCurrency": "EUR",
-                "unitText": "MONTH"
-              }
+              "offerCount": "3",
+              "offers": [
+                { "@type": "Offer", "name": "Starter", "price": "19", "priceCurrency": "EUR" },
+                { "@type": "Offer", "name": "Pro", "price": "39", "priceCurrency": "EUR" },
+                { "@type": "Offer", "name": "Business", "price": "69", "priceCurrency": "EUR" }
+              ]
             },
             "aggregateRating": {
               "@type": "AggregateRating",

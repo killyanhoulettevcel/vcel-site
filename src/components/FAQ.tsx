@@ -32,8 +32,8 @@ const faqs = [
     a: "Non. Le coach IA est un outil d'aide à la décision basé sur vos propres données business. Il vous aide à identifier des opportunités, suivre vos objectifs et prioriser vos actions. Pour des décisions financières importantes, consultez un expert-comptable."
   },
   {
-    q: "C'est quoi le code promo SOLOFREE ?",
-    a: "Un code promotionnel de lancement qui offre votre premier mois gratuitement (valeur 49€). Il s'applique directement sur la page de paiement Stripe, sur les abonnements mensuels et annuels. Sans engagement — résiliable avant le 2e mois si vous n'êtes pas satisfait."
+    q: "Comment fonctionne la période d'essai gratuite ?",
+    a: "Les plans Starter et Pro incluent 14 jours d'essai gratuits. Vous entrez votre carte bancaire lors de l'inscription, mais aucun débit n'est effectué pendant 14 jours. Vous pouvez résilier à tout moment avant la fin de l'essai sans frais. À l'issue des 14 jours, votre abonnement démarre automatiquement."
   },
 ]
 

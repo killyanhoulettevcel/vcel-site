@@ -65,7 +65,11 @@ function CGV() {
       <section>
         <h2 className="text-lg font-semibold mb-3" style={{ color: '#0D1B2A' }}>3. Prix et facturation</h2>
         <p className="text-sm leading-relaxed" style={{ color: '#3D5166' }}>
-          Le tarif de l'abonnement Starter est de 49€ TTC/mois (ou 39€ TTC/mois en formule annuelle, facturé 468€/an).
+          Les tarifs des abonnements VCEL sont les suivants :
+          - Plan Starter : 19€ TTC/mois (ou 15€ TTC/mois en formule annuelle, facturé 180€/an)
+          - Plan Pro : 39€ TTC/mois (ou 31€ TTC/mois en formule annuelle, facturé 372€/an)
+          - Plan Business : 69€ TTC/mois (ou 55€ TTC/mois en formule annuelle, facturé 660€/an)
+          Les plans Starter et Pro bénéficient d'une période d'essai gratuite de 14 jours. Aucun débit n'est effectué pendant cette période.
           Les prix sont indiqués en euros toutes taxes comprises. La facturation est effectuée via Stripe à la date
           de souscription, puis chaque mois ou chaque année selon la formule choisie.
         </p>

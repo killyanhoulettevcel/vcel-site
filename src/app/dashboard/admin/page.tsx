@@ -209,7 +209,11 @@ export default function AdminDashboard() {
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const actifs     = clients.filter(c => c.statut === 'actif').length
-  const mrr        = actifs * 49
+  // MRR dynamique par plan (Starter 19, Pro 39, Business 69 — fallback 39 si plan inconnu)
+  const PLAN_PRICE: Record<string, number> = { starter: 19, pro: 39, business: 69 }
+  const mrr = clients
+    .filter(c => c.statut === 'actif')
+    .reduce((sum, c) => sum + (PLAN_PRICE[(c as any).plan] ?? 39), 0)
   const totalLeads = clients.reduce((s, c) => s + (c.leads || 0), 0)
   const totalWfOk  = clients.reduce((s, c) => s + (c.workflows?.filter(w => w.statut === 'ok').length || 0), 0)
   const wfWarnings = clients.reduce((s, c) => s + (c.workflows?.filter(w => w.statut === 'warning').length || 0), 0)
@@ -217,12 +221,12 @@ export default function AdminDashboard() {
   const wfProblemes = wfWarnings + wfErreurs
 
   const mrrData = clients.length > 0 ? [
-    { mois: 'Oct', mrr: Math.max(0, actifs - 5) * 49 },
-    { mois: 'Nov', mrr: Math.max(0, actifs - 4) * 49 },
-    { mois: 'Déc', mrr: Math.max(0, actifs - 3) * 49 },
-    { mois: 'Jan', mrr: Math.max(0, actifs - 2) * 49 },
-    { mois: 'Fév', mrr: Math.max(0, actifs - 1) * 49 },
-    { mois: 'Mar', mrr: actifs * 49 },
+    { mois: 'Oct', mrr: Math.max(0, actifs - 5) * 39 },
+    { mois: 'Nov', mrr: Math.max(0, actifs - 4) * 39 },
+    { mois: 'Déc', mrr: Math.max(0, actifs - 3) * 39 },
+    { mois: 'Jan', mrr: Math.max(0, actifs - 2) * 39 },
+    { mois: 'Fév', mrr: Math.max(0, actifs - 1) * 39 },
+    { mois: 'Mar', mrr: mrr },
   ] : []
 
   return (
@@ -276,7 +280,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Clients actifs',   value: String(actifs),    sub: `${clients.length} total`,       icon: Users,     alert: false },
-          { label: 'MRR',              value: `${mrr}€`,         sub: `${actifs} × 49€/mois`,          icon: Euro,      alert: false },
+          { label: 'MRR',              value: `${mrr}€`,         sub: `MRR calculé par plan`,          icon: Euro,      alert: false },
           { label: 'Leads générés',    value: String(totalLeads),sub: 'tous clients confondus',         icon: TrendingUp,alert: false },
           {
             label: 'Workflows actifs',
@@ -311,7 +315,7 @@ export default function AdminDashboard() {
         <div className="card-glass p-6 mb-6">
           <div className="mb-4">
             <h2 className="font-display font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>MRR</h2>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Basé sur {actifs} clients actifs × 49€</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Basé sur les plans actifs</p>
           </div>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={mrrData}>
