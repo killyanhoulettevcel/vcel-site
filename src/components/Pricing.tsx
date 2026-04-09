@@ -133,8 +133,8 @@ export default function Pricing() {
       window.location.href = '/contact'
       return
     }
-    const priceId = PRICES[planKey][annual ? 'annual' : 'monthly']
-    window.location.href = `/checkout?plan=${planKey}_${annual ? 'annual' : 'monthly'}&priceId=${priceId}`
+    const billing = annual ? 'annual' : 'monthly'
+    window.location.href = `/checkout?plan=${planKey}&billing=${billing}`
   }
 
   // Calcul ROI basé sur le plan Pro
