@@ -1,293 +1,246 @@
 'use client'
+import PlanGate from '@/components/dashboard/PlanGate'
 import { useState, useEffect } from 'react'
-import { Zap, XCircle, RefreshCw, BarChart2, Mail, ChevronDown, Clock, CheckCircle, AlertTriangle, Info } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
+import { Target, Plus, Trash2, TrendingUp, Users, FileText, Percent, RefreshCw, X, Check, ShoppingBag, BarChart2 } from 'lucide-react'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-interface Workflow {
+interface Objectif {
   id: string
-  workflow_id: string
-  nom: string
-  actif: boolean
-  statut: 'ok' | 'warning' | 'erreur' | 'inactif'
-  nb_executions_jour: number
-  nb_executions_semaine: number
-  nb_executions_mois: number
-  derniere_execution?: string
-  erreur_message?: string
-  nb_tentatives_repair?: number
-  repair_message?: string
-}
-
-interface WorkflowMeta {
+  type: string
   label: string
-  description: string
-  detail: string
-  icon: React.ElementType
-  iconColor: string
-  iconBg: string
-  tag: string
-  schedule: string
+  cible: number
+  periode: string
+  actif: boolean
 }
 
-function getWorkflowMeta(nom: string): WorkflowMeta {
-  if (nom.includes('VCEL-2') || nom.includes('CA Sheets')) {
-    return {
-      label: 'Sync CA depuis Google Sheets',
-      description: 'Lit votre Google Sheet chaque lundi matin et synchronise votre CA, charges et marge dans le dashboard.',
-      detail: 'Ce workflow récupère les données de votre onglet "dashboard" dans Google Sheets, calcule la marge mensuelle et les pousse dans Supabase. Il met aussi à jour le statut des workflows.',
-      icon: BarChart2,
-      iconColor: 'text-blue-600',
-      iconBg: 'bg-blue-50 border-blue-100',
-      tag: 'Finance',
-      schedule: 'Tous les lundis à 6h',
-    }
-  }
-  if (nom.includes('VCEL-3') || nom.includes('Résumé') || nom.includes('Resume')) {
-    return {
-      label: 'Résumé hebdomadaire IA',
-      description: 'Chaque lundi, génère et envoie un email personnalisé avec vos chiffres clés et un conseil actionnable.',
-      detail: 'Ce workflow récupère vos données (CA, leads, factures, objectifs), les envoie à GPT-4o mini qui génère un email HTML personnalisé avec analyse et recommandations, puis l\'envoie sur votre boîte Gmail.',
-      icon: Mail,
-      iconColor: 'text-violet-600',
-      iconBg: 'bg-violet-50 border-violet-100',
-      tag: 'IA',
-      schedule: 'Tous les lundis à 8h',
-    }
-  }
-  return {
-    label: nom,
-    description: 'Automatisation n8n active sur votre compte.',
-    detail: '',
-    icon: Zap,
-    iconColor: 'text-amber-600',
-    iconBg: 'bg-amber-50 border-amber-100',
-    tag: 'Automation',
-    schedule: 'Planifié',
-  }
+interface Reels {
+  caMois: number
+  chargesMois: number
+  margeMois: number
+  leadsMois: number
+  leadsTotal: number
+  tauxConversion: number
+  montantDu: number
+  nbFacturesMois: number
+  caVentesMois: number
+  nbVentesMois: number
+  margeMoyenne: number
 }
 
-const statutConfig = {
-  ok:      { label: 'Actif',         textColor: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200',   dot: 'bg-emerald-400', icon: CheckCircle },
-  warning: { label: 'En maintenance', textColor: 'text-orange-500',  bg: 'bg-orange-50 border-orange-200',     dot: 'bg-orange-400',  icon: Clock },
-  erreur:  { label: 'En maintenance', textColor: 'text-orange-500',  bg: 'bg-orange-50 border-orange-200',     dot: 'bg-orange-400',  icon: Clock },
-  inactif: { label: 'Inactif',        textColor: 'text-[var(--text-light)]', bg: 'bg-[var(--bg-secondary)] border-[var(--border)]', dot: 'bg-[var(--border-hover)]', icon: Clock },
-}
+const typesObjectif = [
+  { value: 'ca',         label: 'CA mensuel',          icon: TrendingUp, unit: '€', placeholder: '2000' },
+  { value: 'ventes',     label: 'Ventes (€)',           icon: ShoppingBag,unit: '€', placeholder: '1500' },
+  { value: 'leads',      label: 'Leads par mois',       icon: Users,      unit: '',  placeholder: '20' },
+  { value: 'conversion', label: 'Taux de conversion',   icon: Percent,    unit: '%', placeholder: '15' },
+  { value: 'factures',   label: 'Factures émises',      icon: FileText,   unit: '',  placeholder: '10' },
+  { value: 'marge',      label: 'Marge mensuelle',      icon: BarChart2,  unit: '€', placeholder: '1000' },
+  { value: 'custom',     label: 'Personnalisé',         icon: Target,     unit: '',  placeholder: '100' },
+]
 
-export default function WorkflowsPage() {
-  const [workflows, setWorkflows]   = useState<Workflow[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [expanded, setExpanded]     = useState<string | null>(null)
+const emptyForm = { type: 'ca', label: '', cible: '', periode: 'mensuel' }
 
-  const fetchWorkflows = async () => {
+export default function ObjectifsPage() {
+  const [data,     setData]     = useState<{ objectifs: Objectif[], reels: Reels } | null>(null)
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [form,     setForm]     = useState(emptyForm)
+
+  const fetchData = async () => {
+    setLoading(true)
     try {
-      const res  = await fetch('/api/workflows')
-      const data = await res.json()
-      setWorkflows(Array.isArray(data) ? data : [])
-      setLastUpdate(new Date())
+      const res  = await fetch('/api/objectifs')
+      const json = await res.json()
+      setData(json)
     } catch {}
     setLoading(false)
-    setRefreshing(false)
   }
 
-  useEffect(() => {
-    fetchWorkflows()
-    const channel = supabase
-      .channel('workflows-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflows' }, (payload) => {
-        if (payload.eventType === 'UPDATE') {
-          setWorkflows(prev => prev.map(w => w.id === (payload.new as any).id ? { ...w, ...(payload.new as any) } : w))
-          setLastUpdate(new Date())
-        } else { fetchWorkflows() }
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [])
+  useEffect(() => { fetchData() }, [])
 
-  const refresh = () => { setRefreshing(true); fetchWorkflows() }
+  const handleSave = async () => {
+    if (!form.cible) return
+    setSaving(true)
+    const typeInfo = typesObjectif.find(t => t.value === form.type)
+    await fetch('/api/objectifs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, label: form.label || typeInfo?.label || form.type })
+    })
+    setForm(emptyForm); setShowForm(false); setSaving(false)
+    fetchData()
+  }
 
-  const actifs  = workflows.filter(w => w.statut === 'ok').length
-  const erreurs = workflows.filter(w => w.statut === 'erreur').length
-  const totalEx = workflows.reduce((s, w) => s + (w.nb_executions_mois || 0), 0)
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/objectifs?id=${id}`, { method: 'DELETE' })
+    fetchData()
+  }
+
+  const getProgression = (obj: Objectif, reels: Reels): { actuel: number, unite: string } => {
+    switch (obj.type) {
+      case 'ca':         return { actuel: reels.caMois,        unite: '€' }
+      case 'ventes':     return { actuel: reels.caVentesMois,  unite: '€' }
+      case 'leads':      return { actuel: reels.leadsMois,     unite: '' }
+      case 'conversion': return { actuel: reels.tauxConversion,unite: '%' }
+      case 'factures':   return { actuel: reels.nbFacturesMois,unite: '' }
+      case 'marge':      return { actuel: reels.margeMois,     unite: '€' }
+      default:           return { actuel: 0,                   unite: '' }
+    }
+  }
+
+  const getPct    = (actuel: number, cible: number) => cible > 0 ? Math.min(Math.round(actuel / cible * 100), 100) : 0
+  const getStatus = (pct: number) => {
+    if (pct >= 100) return { color: 'text-green-400', bg: 'bg-green-400',  label: '✓ Atteint' }
+    if (pct >= 70)  return { color: 'text-blue-400',  bg: 'bg-blue-400',   label: 'En bonne voie' }
+    if (pct >= 40)  return { color: 'text-orange-400',bg: 'bg-orange-400', label: 'À surveiller' }
+    return             { color: 'text-red-400',   bg: 'bg-red-400',    label: 'En retard' }
+  }
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl">
-
-      {/* Header */}
-      <div className="mb-6 md:mb-8 flex items-start justify-between gap-4">
+    <PlanGate feature="objectifs">
+    <div className="p-4 md:p-8 max-w-2xl">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-xl md:text-2xl font-bold text-[var(--navy)] mb-1">Workflows</h1>
-          <div className="flex items-center gap-3">
-            <p className="text-[var(--text-muted)] text-xs md:text-sm">Vos automatisations n8n actives</p>
-            {lastUpdate && (
-              <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Temps réel
-              </span>
-            )}
-          </div>
+          <h1 className="font-display text-xl md:text-2xl font-bold text-white mb-1">Objectifs & KPIs</h1>
+          <p className="text-white/40 text-sm">Fixe des cibles et suis ta progression en temps réel</p>
         </div>
-        <button onClick={refresh} className="btn-ghost text-sm py-2 px-3 md:px-4 flex items-center gap-2 shrink-0">
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Actualiser</span>
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-        <div className="kpi-card">
-          <p className="text-[var(--text-muted)] text-xs mb-2">Actifs</p>
-          <p className="font-display text-2xl md:text-3xl font-bold text-[var(--navy)]">
-            {actifs}<span className="text-[var(--text-light)] text-sm md:text-lg font-normal">/{workflows.length}</span>
-          </p>
-        </div>
-        <div className="kpi-card">
-          <p className="text-[var(--text-muted)] text-xs mb-2">Maintenance</p>
-          <p className={`font-display text-2xl md:text-3xl font-bold ${erreurs > 0 ? 'text-orange-500' : 'text-[var(--navy)]'}`}>{erreurs}</p>
-        </div>
-        <div className="kpi-card">
-          <p className="text-[var(--text-muted)] text-xs mb-1">Exécutions</p>
-          <p className="text-[var(--text-light)] text-xs mb-1 hidden md:block">ce mois</p>
-          <p className="font-display text-2xl md:text-3xl font-bold text-[var(--navy)]">{totalEx}</p>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchData} className="btn-ghost text-sm py-2.5 px-4">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button onClick={() => setShowForm(true)} className="btn-primary text-sm py-2.5 px-4">
+            <Plus size={14} /> Ajouter
+          </button>
         </div>
       </div>
 
-      {/* Liste */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2].map(i => (
-            <div key={i} className="card-glass p-5 animate-pulse">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)]" />
-                <div className="flex-1">
-                  <div className="h-4 bg-[var(--bg-secondary)] rounded w-48 mb-2" />
-                  <div className="h-3 bg-[var(--bg-secondary)] rounded w-32" />
-                </div>
+      {/* Stats réelles */}
+      {data?.reels && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5 md:mb-6">
+          {[
+            { label: 'CA ce mois',      value: `${data.reels.caMois.toLocaleString('fr-FR')}€`,        icon: TrendingUp,  color: 'text-blue-400' },
+            { label: 'Ventes ce mois',  value: `${data.reels.caVentesMois.toLocaleString('fr-FR')}€`,  icon: ShoppingBag, color: 'text-green-400' },
+            { label: 'Marge ce mois',   value: `${data.reels.margeMois.toLocaleString('fr-FR')}€`,     icon: BarChart2,   color: 'text-purple-400' },
+            { label: 'Leads ce mois',   value: String(data.reels.leadsMois),                            icon: Users,       color: 'text-indigo-400' },
+            { label: 'Taux conversion', value: `${data.reels.tauxConversion}%`,                        icon: Percent,     color: 'text-cyan-400' },
+            { label: 'Impayées',        value: `${data.reels.montantDu.toLocaleString('fr-FR')}€`,     icon: FileText,    color: 'text-orange-400' },
+          ].map(k => (
+            <div key={k.label} className="card-glass p-4 flex items-center gap-3">
+              <k.icon size={15} className={k.color} />
+              <div>
+                <p className="text-white/40 text-xs">{k.label}</p>
+                <p className="text-white font-bold text-sm">{k.value}</p>
               </div>
             </div>
           ))}
         </div>
-      ) : workflows.length === 0 ? (
+      )}
+
+      {/* Formulaire */}
+      {showForm && (
+        <div className="card-glass p-5 mb-5 border border-blue-500/20">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display font-semibold text-white text-sm">Nouvel objectif</h3>
+            <button onClick={() => setShowForm(false)} className="text-white/30 hover:text-white"><X size={16} /></button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Type</label>
+              <div className="flex flex-wrap gap-2">
+                {typesObjectif.map(t => (
+                  <button key={t.value} onClick={() => setForm({...form, type: t.value})}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      form.type === t.value ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                    }`}>
+                    <t.icon size={11} /> {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Label</label>
+                <input value={form.label} onChange={e => setForm({...form, label: e.target.value})}
+                  placeholder={typesObjectif.find(t => t.value === form.type)?.label}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">
+                  Cible ({typesObjectif.find(t => t.value === form.type)?.unit || ''})
+                </label>
+                <input type="number" value={form.cible} onChange={e => setForm({...form, cible: e.target.value})}
+                  placeholder={typesObjectif.find(t => t.value === form.type)?.placeholder}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1.5 uppercase tracking-wider font-semibold">Période</label>
+              <div className="flex gap-2">
+                {['hebdo','mensuel','annuel'].map(p => (
+                  <button key={p} onClick={() => setForm({...form, periode: p})}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
+                      form.periode === p ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-white/50'
+                    }`}>{p}</button>
+                ))}
+              </div>
+            </div>
+            <button onClick={handleSave} disabled={saving || !form.cible} className="btn-primary disabled:opacity-40">
+              {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Check size={14} /> Créer l'objectif</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Liste objectifs */}
+      {loading ? (
         <div className="card-glass p-12 text-center">
-          <Zap size={32} className="text-[var(--text-light)] mx-auto mb-3" />
-          <p className="text-[var(--text-muted)] text-sm">Aucun workflow configuré</p>
-          <p className="text-[var(--text-light)] text-xs mt-1">Vos workflows apparaîtront ici après la configuration initiale</p>
+          <div className="w-6 h-6 border-2 border-white/20 border-t-blue-400 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-white/30 text-sm">Chargement...</p>
+        </div>
+      ) : !data?.objectifs?.length ? (
+        <div className="card-glass p-10 text-center">
+          <Target size={32} className="text-white/10 mx-auto mb-3" />
+          <p className="text-white/30 text-sm mb-1">Aucun objectif défini</p>
+          <p className="text-white/20 text-xs">Ajoute ton premier objectif pour suivre ta progression</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {workflows.map((w) => {
-            const meta   = getWorkflowMeta(w.nom)
-            const s      = statutConfig[w.statut] || statutConfig['inactif']
-            const isOpen = expanded === w.id
-            const StatusIcon = s.icon
-
+          {data.objectifs.map(obj => {
+            const typeInfo = typesObjectif.find(t => t.value === obj.type) || typesObjectif[0]
+            const prog     = getProgression(obj, data.reels)
+            const pct      = getPct(prog.actuel, obj.cible)
+            const status   = getStatus(pct)
             return (
-              <div
-                key={w.id}
-                className={`card-glass overflow-hidden transition-all duration-200 ${w.statut === 'erreur' || w.statut === 'warning' ? 'border-orange-200' : ''}`}
-              >
-                {/* Header cliquable */}
-                <div
-                  className="p-4 md:p-5 cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors"
-                  onClick={() => setExpanded(isOpen ? null : w.id)}
-                >
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${meta.iconBg}`}>
-                      <meta.icon size={17} className={meta.iconColor} />
+              <div key={obj.id} className="card-glass p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                      <typeInfo.icon size={14} className="text-white/50" />
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <p className="text-[var(--text-primary)] text-sm font-semibold">{meta.label}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium flex items-center gap-1.5 ${s.bg} ${s.textColor}`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${s.dot} ${w.statut === 'erreur' || w.statut === 'warning' ? 'animate-pulse' : ''}`} />
-                          {s.label}
-                        </span>
-                        <span className="text-[10px] text-[var(--text-light)] font-mono hidden md:inline">{meta.tag}</span>
-                      </div>
-                      <p className="text-[var(--text-muted)] text-xs truncate">{meta.description}</p>
+                    <div>
+                      <p className="text-white text-sm font-medium">{obj.label}</p>
+                      <p className="text-white/30 text-xs capitalize">{obj.periode}</p>
                     </div>
-
-                    <ChevronDown
-                      size={15}
-                      className={`text-[var(--text-light)] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                    />
                   </div>
-
-                  {(w.statut === 'erreur' || w.statut === 'warning') && (
-                    <div className="mt-3 ml-14 flex items-start gap-2 text-xs rounded-lg p-2.5 border"
-                      style={{ background: 'rgba(249,115,22,0.07)', borderColor: 'rgba(249,115,22,0.20)', color: '#EA580C' }}>
-                      <Clock size={12} className="shrink-0 mt-0.5" />
-                      Ce workflow est en maintenance. Notre équipe travaille à le rétablir automatiquement.
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-medium ${status.color}`}>{status.label}</span>
+                    <button onClick={() => handleDelete(obj.id)} className="text-white/20 hover:text-red-400 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
-
-                {/* Détail expandé */}
-                {isOpen && (
-                  <div className="border-t border-[var(--border)] px-4 md:px-5 py-4 space-y-4 bg-[var(--bg-secondary)]">
-
-                    {meta.detail && (
-                      <div className="flex items-start gap-2.5 bg-white rounded-xl p-3 border border-[var(--border)]">
-                        <Info size={13} className="text-[var(--text-light)] shrink-0 mt-0.5" />
-                        <p className="text-[var(--text-muted)] text-xs leading-relaxed">{meta.detail}</p>
-                      </div>
-                    )}
-
-                    {(w.statut === 'ok' || w.statut === 'inactif') && <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-white rounded-xl p-3 text-center border border-[var(--border)]">
-                        <p className="text-[var(--text-muted)] text-xs mb-1">Exécutions</p>
-                        <p className="text-[var(--navy)] font-display font-bold text-lg">{w.nb_executions_mois || 0}</p>
-                        <p className="text-[var(--text-light)] text-xs">ce mois</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 text-center border border-[var(--border)]">
-                        <p className="text-[var(--text-muted)] text-xs mb-1">Planning</p>
-                        <p className="text-[var(--text-secondary)] text-xs font-medium mt-2 leading-snug">{meta.schedule}</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 text-center border border-[var(--border)]">
-                        <p className="text-[var(--text-muted)] text-xs mb-1">Dernière exec.</p>
-                        <p className="text-[var(--text-secondary)] text-xs font-medium mt-2 leading-snug">
-                          {w.derniere_execution
-                            ? new Date(w.derniere_execution).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-                            : '—'}
-                        </p>
-                      </div>
-                    </div>}
-
-                    <div className={`flex items-center gap-2 rounded-xl p-3 border ${s.bg}`}>
-                      <StatusIcon size={13} className={s.textColor} />
-                      <p className={`text-xs font-medium ${s.textColor}`}>
-                        {w.statut === 'ok'
-                          ? 'Ce workflow tourne normalement. Aucune action requise de votre part.'
-                          : w.statut === 'warning' || w.statut === 'erreur'
-                          ? 'Ce workflow est temporairement en maintenance. Notre équipe intervient automatiquement — aucune action requise de votre part.'
-                          : 'Ce workflow est inactif. Contactez le support si besoin.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-2">
+                  <div className={`h-full ${status.bg} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-white/40">{prog.actuel.toLocaleString('fr-FR')}{prog.unite} atteint</span>
+                  <span className="text-white/60 font-medium">{pct}% — cible : {obj.cible.toLocaleString('fr-FR')}{typeInfo.unit}</span>
+                </div>
               </div>
             )
           })}
         </div>
       )}
-
-      <div className="card-glass p-4 md:p-5 mt-5 md:mt-6 flex items-start gap-3">
-        <Zap size={15} className="text-cyan-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-[var(--text-primary)] text-sm font-medium mb-0.5">Vos workflows tournent automatiquement</p>
-          <p className="text-[var(--text-muted)] text-xs">
-            VCEL-2 synchronise votre CA chaque lundi à 6h depuis Google Sheets.
-            VCEL-3 vous envoie votre résumé IA personnalisé chaque lundi à 8h par email.
-          </p>
-        </div>
-      </div>
     </div>
+    </PlanGate>
   )
 }

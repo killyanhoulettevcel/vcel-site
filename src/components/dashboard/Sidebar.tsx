@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { PLAN_GATES } from '@/lib/usePlan'
 import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Users, Activity, Settings, LogOut,
   Shield, ChevronRight, ChevronDown, Rocket, Brain, Euro, Calculator,
   Target, Upload, Bell, Receipt, CalendarDays, ShoppingBag, Zap,
-  Menu, X, HeartPulse, Landmark, BookTemplate, BarChart2
+  Menu, X, HeartPulse, Landmark, BookTemplate, BarChart2, Lock
 } from 'lucide-react'
 
 // ─── Structure ────────────────────────────────────────────────────────────────
@@ -153,12 +154,13 @@ function GroupTooltip({ group, anchorRef, visible }: {
 // ─── Groupe dépliant ──────────────────────────────────────────────────────────
 
 function NavGroupItem({
-  group, pathname, nbCritiques, onNavigate,
+  group, pathname, nbCritiques, onNavigate, userPlan,
 }: {
   group: NavGroup
   pathname: string
   nbCritiques: number
   onNavigate: () => void
+  userPlan: string
 }) {
   const isActiveGroup = group.items.some(i => pathname.startsWith(i.href) && i.href !== '/dashboard/client' || pathname === i.href)
   const [open, setOpen] = useState(group.defaultOpen || isActiveGroup)
@@ -228,6 +230,11 @@ function NavGroupItem({
               ? pathname === item.href
               : pathname.startsWith(item.href)
 
+            // Détecter si la feature est locked pour ce plan
+            const featureKey = item.href.split('/').pop() || ''
+            const requiredPlan = PLAN_GATES[featureKey]
+            const isLocked = requiredPlan && userPlan !== 'pro' && userPlan !== 'business'
+
             return (
               <a
                 key={item.href}
@@ -236,18 +243,24 @@ function NavGroupItem({
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
                 style={{
                   background: isActive ? 'var(--navy)' : 'transparent',
-                  color: isActive ? 'white' : 'var(--text-secondary)',
+                  color: isLocked ? 'var(--text-light)' : isActive ? 'white' : 'var(--text-secondary)',
                   boxShadow: isActive ? '0 2px 8px rgba(13,27,42,0.15)' : 'none',
+                  opacity: isLocked ? 0.6 : 1,
                 }}
               >
                 <item.icon size={13} style={{
-                  color: isActive ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
+                  color: isLocked ? 'var(--text-light)' : isActive ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
                   flexShrink: 0,
                 }} />
                 <span className="flex-1 truncate">{item.label}</span>
 
+                {/* Badge lock */}
+                {isLocked && (
+                  <Lock size={9} style={{ color: 'var(--text-light)', flexShrink: 0 }} />
+                )}
+
                 {/* Badge alertes critiques */}
-                {item.badge && nbCritiques > 0 && (
+                {item.badge && nbCritiques > 0 && !isLocked && (
                   <span
                     className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white shrink-0"
                     style={{ background: '#EF4444' }}
@@ -257,7 +270,7 @@ function NavGroupItem({
                 )}
 
                 {/* Chevron si actif */}
-                {isActive && !item.badge && (
+                {isActive && !item.badge && !isLocked && (
                   <ChevronRight size={11} style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
                 )}
               </a>
@@ -278,6 +291,7 @@ export default function Sidebar() {
   const [nbCritiques, setNbCritiques] = useState(0)
 
   const role  = (session?.user as any)?.role
+  const plan  = (session?.user as any)?.plan || 'starter'
   const nom   = session?.user?.name  || 'Client'
   const email = session?.user?.email || ''
 
@@ -316,10 +330,15 @@ export default function Sidebar() {
             <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{nom}</p>
             <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{email}</p>
           </div>
-          {role === 'admin' && (
+          {role === 'admin' ? (
             <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
               style={{ background: 'rgba(79,195,247,0.15)', color: 'var(--cyan-dark)' }}>
               Admin
+            </span>
+          ) : (
+            <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold capitalize"
+              style={{ background: 'rgba(13,27,42,0.06)', color: 'var(--text-muted)' }}>
+              {plan}
             </span>
           )}
         </div>
@@ -350,6 +369,7 @@ export default function Sidebar() {
             pathname={pathname}
             nbCritiques={nbCritiques}
             onNavigate={() => setOpen(false)}
+            userPlan={plan}
           />
         ))}
       </nav>

@@ -1,4 +1,5 @@
 'use client'
+import PlanGate from '@/components/dashboard/PlanGate'
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { Send, Sparkles, Brain, RefreshCw, Calendar } from 'lucide-react'
@@ -98,6 +99,7 @@ export default function CoachPage() {
   }
 
   return (
+    <PlanGate feature="coach">
     <div className="flex flex-col h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)]">
       {/* Header */}
       <div className="px-4 md:px-8 py-4 md:py-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
@@ -206,5 +208,6 @@ export default function CoachPage() {
         <p className="text-[var(--text-muted)] text-xs text-center mt-1.5 hidden md:block">Shift+Entrée pour saut de ligne</p>
       </div>
     </div>
+    </PlanGate>
   )
 }

@@ -1,4 +1,5 @@
 'use client'
+import PlanGate from '@/components/dashboard/PlanGate'
 import { useState, useEffect } from 'react'
 import { Target, Plus, Trash2, TrendingUp, Users, FileText, Percent, RefreshCw, X, Check, ShoppingBag, BarChart2 } from 'lucide-react'
 
@@ -95,6 +96,7 @@ export default function ObjectifsPage() {
   }
 
   return (
+    <PlanGate feature="objectifs">
     <div className="p-4 md:p-8 max-w-2xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
@@ -239,5 +241,6 @@ export default function ObjectifsPage() {
         </div>
       )}
     </div>
+    </PlanGate>
   )
 }

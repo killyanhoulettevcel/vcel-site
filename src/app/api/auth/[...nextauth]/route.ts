@@ -55,6 +55,7 @@ export const authOptions: NextAuthOptions = {
           name:  user.nom,
           image: user.avatar_url || null,
           role:  user.role,
+          plan:  user.plan || 'starter',
         }
       },
     }),
@@ -69,7 +70,7 @@ export const authOptions: NextAuthOptions = {
         // Vérifier si l'utilisateur existe déjà dans Supabase
         const { data: existing } = await supabaseAdmin
           .from('users')
-          .select('id, role')
+          .select('id, role, plan')
           .eq('email', email)
           .single()
 
@@ -84,6 +85,7 @@ export const authOptions: NextAuthOptions = {
             .eq('email', email)
           user.id = existing.id
           ;(user as any).role = existing.role
+          ;(user as any).plan = existing.plan || 'starter'
           return true
         }
 
@@ -118,17 +120,19 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.uid  = user.id
         token.role = (user as any).role || 'client'
+        token.plan = (user as any).plan || 'starter'
         return token
       }
       if (!token.uid && token.email) {
         const { data } = await supabaseAdmin
           .from('users')
-          .select('id, role')
+          .select('id, role, plan')
           .eq('email', (token.email as string).toLowerCase())
           .single()
         if (data) {
           token.uid  = data.id
           token.role = data.role || 'client'
+          token.plan = data.plan || 'starter'
         }
       }
       if (!token.role) token.role = 'client'
@@ -137,8 +141,9 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (session?.user) {
-        (session.user as any).id = (token.uid || token.sub) as string
+        (session.user as any).id   = (token.uid || token.sub) as string
         ;(session.user as any).role = (token.role || 'client') as string
+        ;(session.user as any).plan = (token.plan || 'starter') as string
       }
       return session
     },
