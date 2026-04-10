@@ -245,6 +245,39 @@ export async function POST(req: NextRequest) {
         break
       }
 
+      // ── Remboursement Stripe → soustraire du ca_data ────────────────────
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge
+        if (!charge.customer || !charge.amount_refunded) break
+
+        const { data: user } = await supabaseAdmin
+          .from('users')
+          .select('id, email')
+          .eq('stripe_customer_id', charge.customer as string)
+          .single()
+
+        if (!user) break
+
+        const montantRembourse = charge.amount_refunded / 100
+        const mois = new Date(charge.created * 1000).toISOString().slice(0, 7)
+
+        const { data: existingCa } = await supabaseAdmin
+          .from('ca_data')
+          .select('id, ca_ht')
+          .eq('user_id', user.id)
+          .eq('mois', mois)
+          .single()
+
+        if (existingCa) {
+          await supabaseAdmin
+            .from('ca_data')
+            .update({ ca_ht: Math.max(0, (existingCa.ca_ht || 0) - montantRembourse) })
+            .eq('id', existingCa.id)
+          console.log(`[WEBHOOK] Remboursement ${montantRembourse}€ déduit du ca_data — ${user.email} — ${mois}`)
+        }
+        break
+      }
+
       default:
         console.log(`[WEBHOOK] Event ignoré: ${event.type}`)
     }
