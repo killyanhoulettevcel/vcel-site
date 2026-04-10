@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import {
   FileText, AlertCircle, CheckCircle, Clock, Plus, Pencil,
   Trash2, X, Check, RefreshCw, Download, Mail, Loader,
-  Search, ArrowUpDown, Receipt, Landmark, BookTemplate
+  Search, ArrowUpDown, Receipt, Landmark, BookTemplate, FileDown
 } from 'lucide-react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import { exportCSV } from '@/lib/exportCSV'
@@ -114,6 +114,18 @@ export default function FacturesPage() {
       setTimeout(() => setRelanceOk(null), 3000)
     } catch (e: any) { setRelanceErr(e.message) }
     setRelancing(null)
+  }
+
+  const downloadPDF = async (f: Facture) => {
+    const res = await fetch(`/api/factures/pdf?id=${f.id}`)
+    if (!res.ok) { alert('Erreur génération PDF'); return }
+    const blob = await res.blob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${f.type_facture || 'facture'}-${f.numero_facture}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const SortBtn = ({ field, label }: { field: typeof sortField; label: string }) => (
@@ -269,6 +281,11 @@ export default function FacturesPage() {
                               {relancing === f.id ? <Loader size={13} className="animate-spin" /> : relanceOk === f.id ? <Check size={13} /> : <Mail size={13} />}
                             </button>
                           )}
+                          <button onClick={() => downloadPDF(f)}
+                            title="Télécharger PDF"
+                            className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-light)' }}>
+                            <FileDown size={13} />
+                          </button>
                           <button onClick={() => router.push(`/dashboard/client/factures/nouvelle?edit=${f.id}`)}
                             className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-light)' }}>
                             <Pencil size={13} />
