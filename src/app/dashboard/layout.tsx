@@ -2,6 +2,7 @@
 import { SessionProvider, useSession } from 'next-auth/react'
 import Sidebar from '@/components/dashboard/Sidebar'
 import Notifications from '@/components/dashboard/Notifications'
+import InstallPWA from '@/components/dashboard/InstallPWA'
 import { Bell, Settings } from 'lucide-react'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-auto pt-14 lg:pt-0" style={{ minHeight: 0 }}>
           {children}
         </main>
+        <InstallPWA />
       </div>
     </div>
   )
