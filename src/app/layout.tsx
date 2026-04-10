@@ -3,6 +3,14 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'VCEL — Logiciel de gestion pour solopreneurs et TPE/PME | Dashboard IA',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'VCEL',
+  },
+  formatDetection: { telephone: false },
+  themeColor: '#0D1B2A',
   description: 'VCEL automatise votre gestion d\'entreprise : dashboard financier, CRM leads avec score IA, gestion des factures et coach IA personnel. Dès 19€/mois · 14 jours gratuits · sans engagement.',
   metadataBase: new URL('https://vcel.fr'),
   keywords: [
@@ -58,6 +66,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" />
+        {/* PWA */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="VCEL" />
+        <link rel="apple-touch-icon" href="/icons/maskable-192x192.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/maskable-152x152.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icons/maskable-512x512.png" />
+        <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+        <meta name="msapplication-TileColor" content="#0D1B2A" />
+        {/* Enregistrement Service Worker */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js').catch(function() {});
+            });
+          }
+        `}} />
         {/* Build ID pour reset auto du compteur maintenance */}
         <meta name="build-id" content={process.env.VERCEL_DEPLOYMENT_ID || process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID || 'local'} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

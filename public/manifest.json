@@ -1,0 +1,57 @@
+{
+  "name": "VCEL — Gestion freelance",
+  "short_name": "VCEL",
+  "description": "Dashboard financier, CRM leads, factures et coach IA pour freelances et TPE.",
+  "start_url": "/dashboard/client",
+  "display": "standalone",
+  "background_color": "#0D1B2A",
+  "theme_color": "#0D1B2A",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "fr",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-72x72.png",     "sizes": "72x72",     "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-96x96.png",     "sizes": "96x96",     "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-128x128.png",   "sizes": "128x128",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-144x144.png",   "sizes": "144x144",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-152x152.png",   "sizes": "152x152",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192x192.png",   "sizes": "192x192",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-384x384.png",   "sizes": "384x384",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512x512.png",   "sizes": "512x512",   "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Factures",
+      "short_name": "Factures",
+      "description": "Accéder à mes factures",
+      "url": "/dashboard/client/factures",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Leads CRM",
+      "short_name": "Leads",
+      "description": "Accéder à mon CRM",
+      "url": "/dashboard/client/leads",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Finances",
+      "short_name": "Finances",
+      "description": "Voir mes finances",
+      "url": "/dashboard/client/finances",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/logo.png",
+      "sizes": "400x400",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard VCEL"
+    }
+  ]
+}
