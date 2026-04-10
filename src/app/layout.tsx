@@ -1,6 +1,13 @@
 import type { Metadata } from 'next'
 import './globals.css'
 
+export const viewport = {
+  themeColor: '#0D1B2A',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
+
 export const metadata: Metadata = {
   title: 'VCEL — Logiciel de gestion pour solopreneurs et TPE/PME | Dashboard IA',
   manifest: '/manifest.json',
@@ -10,7 +17,7 @@ export const metadata: Metadata = {
     title: 'VCEL',
   },
   formatDetection: { telephone: false },
-  themeColor: '#0D1B2A',
+
   description: 'VCEL automatise votre gestion d\'entreprise : dashboard financier, CRM leads avec score IA, gestion des factures et coach IA personnel. Dès 19€/mois · 14 jours gratuits · sans engagement.',
   metadataBase: new URL('https://vcel.fr'),
   keywords: [
