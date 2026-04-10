@@ -67,14 +67,20 @@ const PENALITES = "Tout retard de paiement entraîne des pénalités de retard a
 
 // ─── Numérotation auto ────────────────────────────────────────────────────────
 
-async function genererNumero(profil: Profil | null): Promise<string> {
-  const now  = new Date()
-  const year = now.getFullYear()
+async function genererNumero(type: string = 'facture'): Promise<string> {
+  const now   = new Date()
+  const year  = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
+  const TYPE_PREFIX: Record<string, string> = {
+    facture:  'F',
+    avoir:    'AV',
+    acompte:  'AC',
+    proforma: 'PRO',
+  }
+  const prefix = `${TYPE_PREFIX[type] || 'F'}-${year}${month}-`
   try {
     const res  = await fetch('/api/factures')
     const list = await res.json()
-    const prefix = `F-${year}${month}-`
     const existing = (list as any[])
       .map(f => f.numero_facture)
       .filter((n: string) => n?.startsWith(prefix))
@@ -82,7 +88,7 @@ async function genererNumero(profil: Profil | null): Promise<string> {
     const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
     return `${prefix}${String(next).padStart(3, '0')}`
   } catch {
-    return `F-${year}${month}-001`
+    return `${prefix}001`
   }
 }
 
@@ -202,7 +208,7 @@ function FormulaireFactureInner({ isEdit = false }: { isEdit?: boolean }) {
         }
       } else {
         // Mode création : numéro auto + mentions légales
-        const numero = await genererNumero(profilRes)
+        const numero = await genererNumero(typeParam)
         const echeance = new Date()
         echeance.setDate(echeance.getDate() + 30)
         setForm(prev => ({
