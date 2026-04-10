@@ -58,6 +58,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" />
+        {/* Build ID pour reset auto du compteur maintenance */}
+        <meta name="build-id" content={process.env.VERCEL_DEPLOYMENT_ID || process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID || 'local'} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
