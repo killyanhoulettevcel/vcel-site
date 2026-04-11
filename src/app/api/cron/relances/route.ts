@@ -99,12 +99,13 @@ export async function GET(req: NextRequest) {
       const dateLimit = new Date(today)
       dateLimit.setDate(dateLimit.getDate() - delai)
 
+      // Utiliser date_echeance si disponible, sinon date_facture + délai
       const { data: factures } = await supabaseAdmin
         .from('factures')
         .select('*')
         .eq('user_id', user.id)
         .in('statut', ['en attente', 'en retard'])
-        .lte('date_facture', dateLimit.toISOString().split('T')[0])
+        .or(`date_echeance.lte.${today.toISOString().split('T')[0]},and(date_echeance.is.null,date_facture.lte.${dateLimit.toISOString().split('T')[0]})`)
 
       for (const facture of factures || []) {
         if (!facture.email_client) continue
@@ -115,12 +116,16 @@ export async function GET(req: NextRequest) {
           .gte('sent_at', new Date(new Date().setHours(0,0,0,0)).toISOString())
           .limit(1)
         if (already?.length) continue
+        // Passer en retard automatiquement si date_echeance dépassée
+        if (facture.date_echeance && new Date(facture.date_echeance) < today && facture.statut === 'en attente') {
+          await supabaseAdmin.from('factures').update({ statut: 'en retard' }).eq('id', facture.id)
+        }
         try {
           const tpl = templateRelanceFacture({
             nomClient: facture.nom_client || facture.email_client,
             numeroFacture: facture.numero_facture,
             montant: facture.montant_ttc,
-            dateEcheance: facture.date_facture,
+            dateEcheance: facture.date_echeance || facture.date_facture,
             nomExpediteur: user.nom,
           })
           await sendEmailFromUser(supabaseAdmin, user.id, { to: facture.email_client, ...tpl })
