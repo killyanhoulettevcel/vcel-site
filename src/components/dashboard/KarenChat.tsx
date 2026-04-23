@@ -190,8 +190,8 @@ export default function KarenChat() {
                           : 'text-[var(--text-primary)] border border-[var(--border)] rounded-bl-sm'
                       }`}
                       style={msg.role === 'user'
-                        ? { background: 'linear-gradient(135deg, #0D1B2A, #1A2E45)' }
-                        : { background: 'var(--bg-secondary)' }
+                        ? { background: 'linear-gradient(135deg, #0D1B2A, #1A2E45)', color: '#ffffff' }
+                        : { background: 'var(--bg-secondary)', color: 'var(--text-primary)' }
                       }
                     >
                       {msg.content}
