@@ -4,7 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 
-const N8N_WEBHOOK_URL = 'https://n8n.vcel.fr/webhook-test/karen-chat'
+const N8N_WEBHOOK_URL = 'https://n8n.vcel.fr/webhook/karen-chat'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
