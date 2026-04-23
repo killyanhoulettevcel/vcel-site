@@ -186,7 +186,7 @@ export default function KarenChat() {
                     <div
                       className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                         msg.role === 'user'
-                          ? 'text-white rounded-br-sm'
+                          ? '!text-white rounded-br-sm'
                           : 'text-[var(--text-primary)] border border-[var(--border)] rounded-bl-sm'
                       }`}
                       style={msg.role === 'user'
