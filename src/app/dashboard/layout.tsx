@@ -3,6 +3,7 @@ import { SessionProvider, useSession } from 'next-auth/react'
 import Sidebar from '@/components/dashboard/Sidebar'
 import Notifications from '@/components/dashboard/Notifications'
 import InstallPWA from '@/components/dashboard/InstallPWA'
+import KarenChat from '@/components/dashboard/KarenChat'
 import { Bell, Settings } from 'lucide-react'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </main>
         <InstallPWA />
       </div>
+      <KarenChat />
     </div>
   )
 }
