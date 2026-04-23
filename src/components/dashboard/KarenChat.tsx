@@ -154,9 +154,9 @@ export default function KarenChat() {
             onClick={() => setMinimized(!minimized)}
           >
             <div className="flex items-center gap-3">
-              <KarenAvatar size={36} showDot />
+              <KarenAvatar size={28} showDot />
               <div>
-                <p className="text-white text-sm font-semibold leading-none">Karen</p>
+                <p style={{color: "#ffffff"}} className="text-sm font-semibold leading-none">Karen</p>
                 <p className="text-emerald-400 text-[10px] mt-0.5">En ligne · Assistante VCEL</p>
               </div>
             </div>
